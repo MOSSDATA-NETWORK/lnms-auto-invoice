@@ -212,7 +212,7 @@ function Metric({
   )
 }
 
-export type AgingDatum = ReceivablesReport['aging'][number] & {
+type AgingDatum = ReceivablesReport['aging'][number] & {
   label: string
   chart_ratio: number
 }
