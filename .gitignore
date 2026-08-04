@@ -1,0 +1,29 @@
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Java
+target/
+*.log
+.mvn/timing.properties
+
+# Node
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+.playwright-mcp/
+backend/core/.jqwik-database
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime data
+/data/
+/tmp/
+/auto-invoice-*.png
+.gstack/

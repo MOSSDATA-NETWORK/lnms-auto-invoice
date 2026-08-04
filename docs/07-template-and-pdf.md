@@ -25,6 +25,8 @@
 - `<script>`、事件属性和 JavaScript URL。
 - 远程 HTTP/HTTPS、`file://` 和本地路径。
 - CSS 远程 `url()`、表达式和非白名单能力。
+- `@page size` 只允许 `A3`、`A4`、`A5`、`Letter`、`Legal`、`auto` 及横竖方向组合；自定义或极小纸张拒绝发布。
+- CSS escape、HTML entity、空白拆分、动态 Handlebars URL 和畸形/未闭合 `<style>` 都必须先规范化再校验，不能借此绕过 URL、脚本或资源上限。
 - 任意 Handlebars helper。
 - 环境变量、数据库、内部 API 和云元数据访问。
 
@@ -35,8 +37,13 @@
 - 非 root 用户。
 - 只读根文件系统。
 - 默认无网络。
-- 临时目录、CPU、内存、页数和超时限制。
-- HTML 大小、图片数量、像素和字体大小限制。
+- Handlebars 只能通过 `MapValueResolver` 读取冻结 JSON 模型，禁止 JavaBean、方法和 `class` 反射属性解析。
+- 渲染文档注入 deny-by-default CSP；脚本、连接、对象、表单和 base URL 全部禁用，仅允许内联样式及 `data:` 图片/字体。
+- Playwright BrowserContext 显式关闭 JavaScript、下载和 Service Worker，强制 offline，并对所有网络请求执行 abort；模板发布前和 Handlebars 展开后各执行一次安全校验，动态数据生成的远程 URL 同样会被拒绝。
+- Chromium 显式启用沙箱；Render Worker 以 `pwuser`、`CapEff=0` 和 `no-new-privileges` 运行，加载与 Playwright `v1.59.0` 同版本且校验过 SHA-256 的 seccomp profile。该 profile 只相对官方版本无条件放行 `chroot` syscall，使 Chromium 在自己的 user namespace 内完成沙箱初始化，不向容器增加 `CAP_SYS_CHROOT`。Playwright Java 的固定版本 Node 二进制预置在只读镜像层并通过 `PLAYWRIGHT_NODEJS_PATH` 使用，因此 `/tmp` 可保持 `noexec`；禁止使用 `--no-sandbox`、`seccomp=unconfined` 或增加系统能力规避问题。
+- 单次渲染使用独立 daemon executor，整个操作硬超时 30 秒；超时、中断或异常时取消任务，并强制清理本次渲染新建的 Node/Chromium 子孙进程。
+- 源 HTML 最多 1,000,000 字符、CSS 最多 500,000 字符、展开后 HTML 最多 4,000,000 字符；单个 `data:` URI 最多 512,000 字符、合计最多 1,000,000 字符、最多 100 个且 header 最多 256 字符。
+- 声明布局高度和 Chromium 实际布局高度均不得超过 120,000 CSS px；最终 PDF 必须以 `%PDF-` 开头、最多 100 页且不超过 16 MiB。
 
 ## 5. 模板变量
 
@@ -114,3 +121,5 @@ custom.*
 - 中文、英文、长公司名和多页明细。
 - 零税、含税、无流量图和空列表。
 - 图片、字体、分页、页眉页脚和金额对齐。
+- `@page` 白名单、HTML/CSS/展开后 HTML、`data:` URI、声明/实际布局高度、30 秒硬超时、100 页和 16 MiB 上限。
+- 超时和渲染异常后不得残留本次任务创建的 Chromium/Node 进程；真实生产镜像冒烟必须确认沙箱参数未被关闭。

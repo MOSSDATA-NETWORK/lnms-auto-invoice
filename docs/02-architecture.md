@@ -11,6 +11,8 @@
 ```mermaid
 flowchart LR
     User[内部用户 / 客户门户] --> Proxy[Reverse Proxy]
+    Proxy --> Web[React 静态应用]
+    Web -->|同源 /api/v1| Proxy
     Proxy --> API[Auto Invoice API]
     API --> PG[(PostgreSQL)]
     API --> Redis[(Redis)]
@@ -36,7 +38,7 @@ flowchart LR
 
 | 服务 | 职责 | 事实数据 |
 |---|---|---|
-| `reverse-proxy` | TLS、访问控制、请求限制 | 无 |
+| `web` / `reverse-proxy` | React 静态文件、TLS、访问控制、请求限制、`/api/v1` 反向代理 | 无 |
 | `auto-invoice-api` | REST、认证、后台和门户接口 | PostgreSQL |
 | `auto-invoice-scheduler` | 周期触发和扫描 | Quartz 表 |
 | `worker-sync` | LibreNMS 和证据归档 | PostgreSQL、对象存储 |
@@ -109,11 +111,23 @@ Quartz 创建持久任务
 - 秘密通过 Docker Secret、KMS 或环境注入，不写入镜像和 Git。
 - API、Worker 和依赖服务均提供健康检查。
 - 数据库迁移使用 Flyway，应用启动不自动执行不可逆大迁移。
+- 前端与 API 保持同源，认证使用服务端会话和 HttpOnly Cookie；Reverse Proxy 不把会话 Token 暴露给 JavaScript。
 
-## 9. 技术栈
+## 9. 工程结构
 
-- Java 21、Spring Boot、Spring Security、Hibernate/JdbcTemplate。
+- Maven Wrapper 聚合 `backend/core`、`backend/api` 和 `backend/worker`。
+- `core` 保存领域服务、计费规则、任务、Outbox 和 Flyway 迁移；API 与 Worker 不复制领域规则。
+- `api` 提供 REST、Spring Security 会话、CSRF 和 OpenAPI。
+- `worker` 通过不同环境变量启用同步、计费、导入、渲染、通知、Quartz 调度和 Outbox 发布能力。
+- `frontend` 使用 pnpm 10、Vite 和 TanStack Router 文件路由，生产构建由 Nginx 提供静态文件并代理 `/api/v1`。
+- API 启动器提交 `/v3/api-docs` 导出的 OpenAPI 3.1 静态契约；前端从该契约生成模型、Axios 客户端和 TanStack Query Hooks，不复制维护响应 DTO。
+- Spring Boot 4 的 HTTP 序列化使用 Jackson 3；现有领域、任务和 Worker JSON 代码通过显式 Jackson 2 `ObjectMapper` 复用同一十进制字符串规则，迁移完成前不得依赖自动装配碰巧选择版本。
+
+## 10. 技术栈
+
+- Java 21、Spring Boot、Spring Security、Spring Modulith、JdbcClient。
 - PostgreSQL 16+、Redis、Quartz、Flyway。
 - MinIO/S3、Handlebars、Playwright Java、Chromium。
-- Vue 3、TypeScript、Element Plus、Pinia、Vue Router、ECharts。
-- OpenAPI、Testcontainers、WireMock、JUnit 5、Playwright E2E。
+- React 19、TypeScript、Vite、Tailwind CSS 4、shadcn/ui。
+- TanStack Router/Query/Table、React Hook Form、Zod、Zustand、Orval + Axios、Recharts、React i18next、Decimal.js。
+- OpenAPI、Testcontainers、WireMock、JUnit 5、Vitest Browser Mode、Playwright E2E。

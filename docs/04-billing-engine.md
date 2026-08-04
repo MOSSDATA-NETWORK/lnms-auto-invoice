@@ -134,6 +134,8 @@ final_before_discount = maximum_charge == null
 - `NO_PRORATION`：不足月不折算。
 - `FULL_MONTH_IF_ACTIVE`：账期内有效即收整月。
 
+服务有效期与账期没有交集时，所有折算模式的费用都必须为零；`NO_PRORATION` 和 `FULL_MONTH_IF_ACTIVE` 也不能对账期外服务收取整月费用。
+
 ## 12. 取整
 
 - `NONE`
@@ -141,6 +143,12 @@ final_before_discount = maximum_charge == null
 - `HALF_UP_INTEGER`
 - `CEIL_INTEGER`
 - `CEIL_STEP`
+
+价格版本中的 `unit_price`、`base_fee`、`committed_quantity`、`overage_unit_price`、
+`minimum_charge` 和 `maximum_charge` 均允许为空，但非空时必须大于等于零。
+合同计费项默认数量、阶梯下界和阶梯单价也不得为负数。`rounding_scale` 非空时必须位于
+`0..12`，且 `DECIMAL_SCALE` 必须提供该值；数据库约束与领域校验同时执行，禁止绕过 API
+直接写入非法计费参数。
 
 系统分别保存原始值、转换值、取整值和计费值。
 

@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+**/target
+**/node_modules
+frontend/dist
+frontend/coverage
+data
+tmp
+.env

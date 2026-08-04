@@ -17,12 +17,18 @@ Auto Invoice 是面向 IDC、带宽、托管、IP、机柜、专线和其他周�
 
 ## 已确定的技术方向
 
-- Java 21、Spring Boot、Spring Security。
-- Vue 3、TypeScript、Element Plus、ECharts。
+- Java 21、Spring Boot 模块化单体、Spring Security、Spring Modulith。
+- React 19、TypeScript、Vite、Tailwind CSS 4、shadcn/ui。
+- TanStack Router/Query/Table、React Hook Form、Zod、Zustand、Orval、Axios、Recharts 和 React i18next。
 - PostgreSQL 16+、Redis、Quartz、MinIO/S3。
-- 模块化单体 API，加独立同步、计费、渲染和通知 Worker。
+- Maven Wrapper 管理共享领域核心、API 启动器和 Worker 启动器；同步、计费、渲染、导入和通知 Worker 复用同一领域实现。
 - Handlebars 无脚本模板沙箱，Playwright/Chromium 生成 PDF。
+- React 静态文件由 Reverse Proxy 提供，`/api/v1` 同源转发至 Spring Boot。
 - Docker Compose 作为首版私有化部署基线。
+
+前端以 [`satnaing/shadcn-admin`](https://github.com/satnaing/shadcn-admin) 提交
+`e16c87f213a5ba5e45964e9b67c792105ec74d26` 为一次性代码基线，不自动同步上游。许可归属见
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 ## 文档入口
 
@@ -40,4 +46,6 @@ Auto Invoice 是面向 IDC、带宽、托管、IP、机柜、专线和其他周�
 
 ## 当前状态
 
-仓库处于设计和初始化阶段，尚无业务代码。第一阶段应先完成领域模型、数据库迁移、计费引擎和 LibreNMS 契约，再实现后台页面与自动发送。
+仓库已经形成可构建的 MVP 实现：包含 Flyway 迁移、身份与租户、客户/业务/合同、版本化价格、LibreNMS 证据、预览与审批、正式化与更正、模板/PDF、通知、付款、导入、报表、运维开关和 React 管理后台。
+
+当前仍属于上线前工程阶段。生产切换前必须在可用 Docker/PostgreSQL 环境完成空库迁移、Testcontainers、Playwright 端到端、容器启动、真实 LibreNMS 只读冒烟、性能与恢复演练；不能仅凭本地单元测试判定可上线。

@@ -15,6 +15,11 @@ LibreNMS 负责设备、端口、采样、Bill、Bill History、95 值和流量�
 
 Token 只返回遮罩值，禁止写入日志。
 
+数据源 `base_url` 必须是根路径 HTTP(S) origin，禁止用户名密码、查询参数、片段和非根路径。部署通过
+`LIBRENMS_ALLOWED_ORIGINS` 配置逗号分隔的 exact-origin allowlist；协议、规范化主机和非默认端口必须精确匹配，
+显式 `http://host:80` 与 `https://host:443` 会归一化为无端口的默认 origin。空 allowlist 默认拒绝所有目标。API 在保存数据源前校验并保存规范化 origin，
+Sync Worker 在每次创建 HTTP 客户端前重新校验数据库中的 origin，以防 API 与 Worker 配置漂移或旧数据绕过。
+
 ## 3. 官方 API 边界
 
 | 用途 | 路径 |
@@ -105,9 +110,14 @@ SYNC_USAGE:{instance_id}:{bill_id}:{period_start}:{period_end}:{purpose}
 ```
 
 同一键只运行一个任务。网络超时、429 和临时 5xx 重试；Token 无效、权限不足和数据校验失败不自动重试。
+重定向不自动跟随，避免已允许的 LibreNMS origin 把请求转向其他地址。
+单次 LibreNMS HTTP 响应最多读取 `16 MiB`；同时校验 `Content-Length` 和实际流式读取字节数，超限以
+`LIBRENMS_RESPONSE_TOO_LARGE` 失败。非 2xx 错误只记录上游状态码，不回显响应正文或认证 Token。
 
 ## 10. 测试策略
 
 - CI 使用脱敏固定响应覆盖 Bill、History、图像、graphdata、空字段、超时和畸形响应。
+- 覆盖空 allowlist、exact-origin 不匹配、默认端口规范化、凭据/query/fragment/path 拒绝，以及 API 保存与 Worker 请求时的双重校验。
+- 覆盖有/无 `Content-Length` 的 `16 MiB` 边界、超限响应和非 2xx 响应脱敏。
 - 预发布每天对真实 LibreNMS 执行只读冒烟测试。
 - 适配器升级必须保存新旧响应样本并跑回归。

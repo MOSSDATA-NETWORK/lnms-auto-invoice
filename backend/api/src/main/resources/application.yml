@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: auto-invoice-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/auto_invoice}
+    username: ${DATABASE_USERNAME:auto_invoice}
+    password: ${DATABASE_PASSWORD:auto_invoice}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    locations: classpath:db/migration
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+    timeout: 30m
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  mvc:
+    problemdetails:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        name: AUTO_INVOICE_SESSION
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: lax
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_DOCS_ENABLED:false}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:false}
+
+auto-invoice:
+  security:
+    master-key-base64: ${AUTO_INVOICE_MASTER_KEY_BASE64:}
+  librenms:
+    allowed-origins: ${LIBRENMS_ALLOWED_ORIGINS:}
+  bootstrap:
+    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+    admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+  storage:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    bucket: ${S3_BUCKET:auto-invoice}

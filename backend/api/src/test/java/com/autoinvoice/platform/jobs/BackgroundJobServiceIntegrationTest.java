@@ -1,0 +1,61 @@
+package com.autoinvoice.platform.jobs;
+
+import com.autoinvoice.platform.DomainException;
+import com.autoinvoice.platform.UuidV7;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import java.time.Duration;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@Testcontainers(disabledWithoutDocker = true)
+class BackgroundJobServiceIntegrationTest {
+    @Container
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.9-alpine");
+
+    private static JdbcClient jdbc;
+    private static BackgroundJobService jobs;
+
+    @BeforeAll
+    static void migrate() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+        jdbc = JdbcClient.create(dataSource);
+        jobs = new BackgroundJobService(jdbc, new ObjectMapper());
+    }
+
+    @Test
+    void onlyTheCurrentOwnerCanRenewAnUnexpiredLease() {
+        UUID tenantId = UuidV7.generate();
+        jdbc.sql("INSERT INTO tenants(id, tenant_code, tenant_name) VALUES (:id, :code, :name)")
+                .param("id", tenantId).param("code", "lease-" + tenantId).param("name", "Lease test")
+                .update();
+        UUID jobId = jobs.enqueue(tenantId, "TEST_JOB", "lease-test-" + tenantId,
+                JsonNodeFactory.instance.objectNode());
+        BackgroundJob claimed = jobs.claimNext("worker-1", Duration.ofMinutes(2), "TEST_JOB").orElseThrow();
+        assertThat(claimed.id()).isEqualTo(jobId);
+
+        jobs.renewLease(jobId, "worker-1", Duration.ofMinutes(5));
+
+        assertThat(jdbc.sql("""
+                        SELECT leased_until > now() + interval '4 minutes'
+                        FROM background_jobs WHERE id = :id
+                        """).param("id", jobId).query(Boolean.class).single()).isTrue();
+        assertThatThrownBy(() -> jobs.renewLease(jobId, "worker-2", Duration.ofMinutes(5)))
+                .isInstanceOf(DomainException.class)
+                .extracting(exception -> ((DomainException) exception).code())
+                .isEqualTo("JOB_LEASE_LOST");
+    }
+}

@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      LIBRENMS_ALLOWED_ORIGINS: https://librenms.example.invalid
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: chmod +x mvnw
+      - run: ./mvnw --batch-mode verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.14.0
+      - run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm api:generate
+      - run: git diff --exit-code -- src/api/generated
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm audit --registry=https://registry.npmjs.org/
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test
+
+  containers:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    env:
+      POSTGRES_ADMIN_PASSWORD: ci-admin-password
+      POSTGRES_MIGRATION_PASSWORD: ci-migration-password
+      POSTGRES_APP_PASSWORD: ci-app-password
+      MINIO_ROOT_PASSWORD: ci-minio-root-password
+      S3_API_SECRET_KEY: ci-api-secret
+      S3_RENDER_SECRET_KEY: ci-render-secret
+      S3_SYNC_SECRET_KEY: ci-sync-secret
+      S3_NOTIFICATION_SECRET_KEY: ci-notification-secret
+      S3_IMPORT_SECRET_KEY: ci-import-secret
+      S3_BILLING_SECRET_KEY: ci-billing-secret
+      AUTO_INVOICE_MASTER_KEY_BASE64: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+      LIBRENMS_ALLOWED_ORIGINS: https://librenms.example.invalid
+      SMTP_HOST: smtp.example.invalid
+      NOTIFICATION_EMAIL_FROM: no-reply@example.invalid
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: docker compose config >/dev/null
+      - run: docker build -t auto-invoice-api-ci -f backend/api/Dockerfile .
+      - run: docker build -t auto-invoice-worker-ci -f backend/worker/Dockerfile .
+      - run: docker build -t auto-invoice-web-ci -f frontend/Dockerfile .
+      - run: docker run --rm -e AUTO_INVOICE_TRUSTED_PROXY_CIDR=192.0.2.1/32 auto-invoice-web-ci nginx -t

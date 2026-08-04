@@ -17,6 +17,7 @@
 | [`sql/001-initial-schema.sql`](sql/001-initial-schema.sql) | PostgreSQL 16+ 初始参考 DDL | 后端、DBA |
 | [`11-frontend-and-operations.md`](11-frontend-and-operations.md) | 菜单、页面行为、任务、部署、监控和备份 | 前端、运维、实施 |
 | [`12-testing-and-roadmap.md`](12-testing-and-roadmap.md) | 测试矩阵、数据导入、并行上线和三阶段路线图 | 测试、项目经理、全体研发 |
+| [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | 前端模板固定提交、MIT 许可归属和本地副本策略 | 法务、前端、发布工程 |
 
 ## 阅读路径
 

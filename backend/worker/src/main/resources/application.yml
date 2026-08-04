@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: auto-invoice-worker
+  main:
+    web-application-type: none
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/auto_invoice}
+    username: ${DATABASE_USERNAME:auto_invoice}
+    password: ${DATABASE_PASSWORD:auto_invoice}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    locations: classpath:db/migration
+  quartz:
+    job-store-type: memory
+    properties:
+      org.quartz.threadPool.threadCount: 2
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS_REQUIRED:true}
+      mail.smtp.ssl.checkserveridentity: ${SMTP_CHECK_SERVER_IDENTITY:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+auto-invoice:
+  worker:
+    id: ${WORKER_ID:auto-invoice-worker-local}
+    job-types: ${WORKER_JOB_TYPES:}
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:false}
+  outbox:
+    enabled: ${OUTBOX_PUBLISHER_ENABLED:false}
+    publisher-id: ${OUTBOX_PUBLISHER_ID:auto-invoice-outbox-local}
+  security:
+    master-key-base64: ${AUTO_INVOICE_MASTER_KEY_BASE64:}
+  librenms:
+    allowed-origins: ${LIBRENMS_ALLOWED_ORIGINS:}
+  storage:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    bucket: ${S3_BUCKET:auto-invoice}
+  notification:
+    email-from: ${NOTIFICATION_EMAIL_FROM:no-reply@auto-invoice.local}
+    allow-insecure-smtp: ${SMTP_ALLOW_INSECURE:false}
+    allow-insecure-http: ${WEBHOOK_ALLOW_INSECURE_HTTP:false}
+    webhook-connect-timeout: ${WEBHOOK_CONNECT_TIMEOUT:10s}
+    webhook-read-timeout: ${WEBHOOK_READ_TIMEOUT:15s}
