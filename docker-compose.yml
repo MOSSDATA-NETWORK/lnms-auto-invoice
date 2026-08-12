@@ -6,7 +6,7 @@ x-application-environment: &application-environment
   DATABASE_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
   FLYWAY_ENABLED: "false"
   AUTO_INVOICE_MASTER_KEY_BASE64: ${AUTO_INVOICE_MASTER_KEY_BASE64:?Set AUTO_INVOICE_MASTER_KEY_BASE64 to a Base64-encoded 32-byte key}
-  LIBRENMS_ALLOWED_ORIGINS: ${LIBRENMS_ALLOWED_ORIGINS:?Set LIBRENMS_ALLOWED_ORIGINS to the comma-separated exact LibreNMS origins}
+  LIBRENMS_ALLOWED_ORIGINS: ${LIBRENMS_ALLOWED_ORIGINS:-}
   S3_ENDPOINT: http://minio:9000
   S3_BUCKET: ${S3_BUCKET:-auto-invoice}
 
@@ -82,7 +82,9 @@ services:
     networks: [core]
 
   minio:
-    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    build:
+      context: .
+      dockerfile: deploy/minio/Dockerfile.minio
     restart: unless-stopped
     command: server /data --console-address :9001
     environment:
@@ -98,7 +100,9 @@ services:
     networks: [core]
 
   minio-init:
-    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    build:
+      context: .
+      dockerfile: deploy/minio/Dockerfile.mc
     depends_on:
       minio:
         condition: service_healthy
@@ -155,7 +159,7 @@ services:
     profiles: [dev]
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+      - "${MAILPIT_BIND_ADDRESS:-0.0.0.0}:${MAILPIT_PORT:-8025}:8025"
     networks: [edge]
 
   api:
@@ -231,7 +235,7 @@ services:
       WORKER_ID: billing-worker-1
       WORKER_JOB_TYPES: GENERATE_INVOICE_PREVIEW
       SCHEDULER_ENABLED: "true"
-    networks: [core]
+    networks: [core, edge]
 
   notification-worker:
     <<: *worker
@@ -298,7 +302,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/ >/dev/null"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/ >/dev/null"]
       interval: 30s
       timeout: 3s
       retries: 3
