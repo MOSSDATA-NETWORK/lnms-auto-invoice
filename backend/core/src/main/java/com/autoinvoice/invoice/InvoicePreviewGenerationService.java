@@ -386,6 +386,31 @@ public class InvoicePreviewGenerationService {
         ArrayNode adjustmentNodes = root.putArray("adjustments");
         adjustments.forEach(value -> adjustmentNodes.add(objectMapper.valueToTree(value)));
         root.set("totals", objectMapper.valueToTree(totals));
+
+        JsonNode party = root.get("party");
+        ObjectNode invoice = root.putObject("invoice");
+        invoice.put("number", previewNumber);
+        invoice.put("preview_number", previewNumber);
+        invoice.put("period_start", periodStart.toString());
+        invoice.put("period_end", periodEnd.toString());
+        invoice.put("issue_date", issueDate.toString());
+        invoice.put("due_date", dueDate.toString());
+        invoice.put("currency_code", profile.currency());
+        invoice.set("items", itemNodes);
+        invoice.set("adjustments", adjustmentNodes);
+        invoice.set("totals", root.get("totals"));
+        ObjectNode customer = root.putObject("customer");
+        customer.put("id", party.path("customer_id").asText());
+        customer.put("customer_no", party.path("customer_no").asText());
+        customer.put("customer_name", party.path("customer_name").asText());
+        ObjectNode company = root.putObject("company");
+        company.put("id", party.path("company_id").asText());
+        company.put("company_code", party.path("company_code").asText());
+        company.put("company_name", party.path("company_name").asText());
+        company.put("company_name_en", party.path("company_name_en").asText(null));
+        company.put("address", party.path("address").asText(null));
+        company.put("tax_number", party.path("tax_number").asText(null));
+        company.put("invoice_title", party.path("invoice_title").asText(null));
         return root;
     }
 
