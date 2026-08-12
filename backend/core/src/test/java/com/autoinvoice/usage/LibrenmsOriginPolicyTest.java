@@ -54,14 +54,29 @@ class LibrenmsOriginPolicyTest {
     }
 
     @Test
-    void emptyConfigurationFailsClosed() {
+    void emptyConfigurationAllowsSelfServiceRegistration() {
         LibrenmsOriginPolicy policy = new LibrenmsOriginPolicy("  ");
 
-        assertThatThrownBy(() -> policy.requireAllowed("https://librenms.example"))
-                .isInstanceOfSatisfying(DomainException.class, exception -> {
-                    assertThat(exception.code()).isEqualTo("LIBRENMS_ORIGINS_NOT_CONFIGURED");
-                    assertThat(exception.status()).isEqualTo(503);
-                });
+        assertThat(policy.requireAllowed("https://librenms.example").toString())
+                .isEqualTo("https://librenms.example");
+        assertThat(policy.requireAllowed("http://192.168.10.20:8080/").toString())
+                .isEqualTo("http://192.168.10.20:8080");
+    }
+
+    @Test
+    void infrastructureAddressesAreAlwaysRejected() {
+        for (String origins : new String[]{"", "https://librenms.example"}) {
+            LibrenmsOriginPolicy policy = new LibrenmsOriginPolicy(origins);
+            for (String origin : new String[]{
+                    "http://localhost", "http://127.0.0.1:9000", "http://169.254.169.254",
+                    "http://0.0.0.0", "http://[::1]", "http://[fe80::1]"
+            }) {
+                assertThatThrownBy(() -> policy.requireAllowed(origin)).as(origin)
+                        .isInstanceOfSatisfying(DomainException.class,
+                                exception -> assertThat(exception.code())
+                                        .isEqualTo("LIBRENMS_ORIGIN_NOT_ALLOWED"));
+            }
+        }
     }
 
     @Test

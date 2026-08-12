@@ -63,11 +63,11 @@ class BackgroundJobServiceIntegrationTest {
     void reenqueueAfterTerminalDeadCreatesAFreshJob() {
         UUID tenantId = newTenant("reenqueue-dead");
         String uniqueKey = "reenqueue-dead-" + tenantId;
-        UUID firstId = jobs.enqueue(tenantId, "TEST_JOB", uniqueKey, JsonNodeFactory.instance.objectNode());
+        UUID firstId = jobs.enqueue(tenantId, "TEST_REENQUEUE", uniqueKey, JsonNodeFactory.instance.objectNode());
         jdbc.sql("UPDATE background_jobs SET status = 'DEAD', attempt_count = max_attempts WHERE id = :id")
                 .param("id", firstId).update();
 
-        UUID secondId = jobs.enqueue(tenantId, "TEST_JOB", uniqueKey, JsonNodeFactory.instance.objectNode());
+        UUID secondId = jobs.enqueue(tenantId, "TEST_REENQUEUE", uniqueKey, JsonNodeFactory.instance.objectNode());
 
         assertThat(secondId).isNotEqualTo(firstId);
         assertThat(jdbc.sql("SELECT status FROM background_jobs WHERE id = :id")
@@ -78,14 +78,14 @@ class BackgroundJobServiceIntegrationTest {
     void reenqueueWhileActiveOrCompletedStillDeduplicates() {
         UUID tenantId = newTenant("reenqueue-active");
         String uniqueKey = "reenqueue-active-" + tenantId;
-        UUID firstId = jobs.enqueue(tenantId, "TEST_JOB", uniqueKey, JsonNodeFactory.instance.objectNode());
+        UUID firstId = jobs.enqueue(tenantId, "TEST_REENQUEUE", uniqueKey, JsonNodeFactory.instance.objectNode());
 
-        assertThat(jobs.enqueue(tenantId, "TEST_JOB", uniqueKey, JsonNodeFactory.instance.objectNode()))
+        assertThat(jobs.enqueue(tenantId, "TEST_REENQUEUE", uniqueKey, JsonNodeFactory.instance.objectNode()))
                 .isEqualTo(firstId);
 
         jdbc.sql("UPDATE background_jobs SET status = 'COMPLETED', completed_at = now() WHERE id = :id")
                 .param("id", firstId).update();
-        assertThat(jobs.enqueue(tenantId, "TEST_JOB", uniqueKey, JsonNodeFactory.instance.objectNode()))
+        assertThat(jobs.enqueue(tenantId, "TEST_REENQUEUE", uniqueKey, JsonNodeFactory.instance.objectNode()))
                 .isEqualTo(firstId);
     }
 
