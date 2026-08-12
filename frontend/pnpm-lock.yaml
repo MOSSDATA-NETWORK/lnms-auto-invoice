@@ -5,18 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@babel/core@^7.0.0': 7.29.6
-  '@napi-rs/wasm-runtime@^1.0.0': 1.2.0
-  brace-expansion@^2.0.0: 2.1.2
-  brace-expansion@^5.0.0: 5.0.9
-  diff@^8.0.0: 8.0.3
-  fast-uri@^3.0.0: 3.1.5
-  lodash-es@^4.0.0: 4.18.0
-  minimatch@^9.0.0: 9.0.7
-  picomatch@^2.0.0: 2.3.2
-  seroval@^1.5.4: 1.5.6
-  seroval-plugins@^1.5.4: 1.5.6
-  ws@^8.0.0: 8.21.0
+  js-yaml: '>=4.3.1'
+  nanoid: '>=3.3.17'
 
 importers:
 
@@ -269,7 +259,7 @@ packages:
     resolution: {integrity: sha512-67oXFAYr2cDLDVGLXTEABjdBJZ6drElUSI7WKp70NrpyISso3plG9SAGEF6y7zbha/wOzUByWWTJvEDVNIUGcA==}
     engines: {node: '>=6.9.0'}
     peerDependencies:
-      '@babel/core': 7.29.6
+      '@babel/core': ^7.0.0
 
   '@babel/helper-string-parser@7.27.1':
     resolution: {integrity: sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA==}
@@ -3007,8 +2997,8 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@4.3.0:
-    resolution: {integrity: sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==}
+  js-yaml@5.2.3:
+    resolution: {integrity: sha512-n+mUVyUX5bVv7G/G2zyIHOhdxfuU1dY2NOFzTQUWiMUbFss8b57NFlgCCaggU78wSw5KVS9cllzeLyzyR+n5nw==}
     hasBin: true
 
   jsesc@3.1.0:
@@ -3288,9 +3278,9 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  nanoid@3.3.16:
-    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
-    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+  nanoid@6.0.1:
+    resolution: {integrity: sha512-3wVS3i51pE2pi1k5FFL/95BGfVS0kSsvDVuGXHOtxox/TywUmtgq+3qiTOTbs9J7KfHaXPiN171k/A6dBnaXFw==}
+    engines: {node: ^22 || ^24 || >=26}
     hasBin: true
 
   natural-compare@1.4.0:
@@ -3632,7 +3622,7 @@ packages:
     resolution: {integrity: sha512-HXuLAX2pu/UByPpaeo/TaMfvMIi+1QqIoPJYCcAtU8QkVNwgR6MPlGuCQTErV1JwraaMbYaWVIBX7mppzGLATQ==}
     engines: {node: '>=10'}
     peerDependencies:
-      seroval: 1.5.6
+      seroval: ^1.0
 
   seroval@1.5.6:
     resolution: {integrity: sha512-rVQVWjjSvlINzaQPZH5JFqsqEsIWdTxY3iJZCnTL/5gQbXIRooVZKI60tVCkOVfzcRPejboxO2t0P89dg5mQaA==}
@@ -6636,7 +6626,7 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@4.3.0:
+  js-yaml@5.2.3:
     dependencies:
       argparse: 2.0.1
 
@@ -6872,7 +6862,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  nanoid@3.3.16: {}
+  nanoid@6.0.1: {}
 
   natural-compare@1.4.0: {}
 
@@ -6919,7 +6909,7 @@ snapshots:
       fs-extra: 11.4.0
       get-tsconfig: 4.14.0
       jiti: 2.6.1
-      js-yaml: 4.3.0
+      js-yaml: 5.2.3
       remeda: 2.39.0
       string-argv: 0.3.2
       typedoc: 0.28.20(typescript@6.0.3)
@@ -7038,7 +7028,7 @@ snapshots:
 
   postcss@8.5.25:
     dependencies:
-      nanoid: 3.3.16
+      nanoid: 6.0.1
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
