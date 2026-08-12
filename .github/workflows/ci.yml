@@ -17,6 +17,12 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.14.0
+      # PdfRendererTest drives a real Chromium; the runner needs the browser
+      # and its system libraries.
+      - run: npx -y playwright@1.59.0 install --with-deps chromium
       - run: chmod +x mvnw
       - run: ./mvnw --batch-mode verify
 
