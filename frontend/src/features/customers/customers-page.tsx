@@ -33,8 +33,13 @@ import {
   updateCustomer,
   type Customer,
 } from '@/api/customers'
-import { createCompany, companiesQuery, updateCompany, type Company } from '@/api/operations'
 import { problemFrom } from '@/api/http'
+import {
+  createCompany,
+  companiesQuery,
+  updateCompany,
+  type Company,
+} from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -684,7 +689,10 @@ function CompanyDialog({
     /^[A-Z]{3}$/.test(currency.trim())
 
   return (
-    <Dialog open={Boolean(customer)} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={Boolean(customer)}
+      onOpenChange={(open) => !open && onClose()}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>新增公司 · {customer?.customer_name}</DialogTitle>
@@ -818,7 +826,10 @@ function CompanyEditDialog({
           </div>
           <div className='space-y-2 sm:col-span-2'>
             <Label>地址</Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
           </div>
           <div className='space-y-2'>
             <Label>税号</Label>

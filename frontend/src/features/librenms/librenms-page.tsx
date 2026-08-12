@@ -11,6 +11,7 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { problemFrom } from '@/api/http'
 import {
   contractItemsQuery,
   contractsQuery,
@@ -28,7 +29,6 @@ import {
   type LibrenmsInstance,
   type LibrenmsMapping,
 } from '@/api/operations'
-import { problemFrom } from '@/api/http'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -262,7 +262,9 @@ export function LibrenmsPage() {
                     role='button'
                     tabIndex={0}
                     onClick={() => setSelectedId(instance.id)}
-                    onKeyDown={(event) => event.key === 'Enter' && setSelectedId(instance.id)}
+                    onKeyDown={(event) =>
+                      event.key === 'Enter' && setSelectedId(instance.id)
+                    }
                     className={`w-full min-w-0 cursor-pointer rounded-lg border p-4 text-left transition-colors ${effectiveId === instance.id ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'hover:bg-muted/40'}`}
                   >
                     <div className='flex items-start justify-between gap-3'>
@@ -879,7 +881,9 @@ function EditInstanceDialog({
   const [name, setName] = useState(instance?.instance_name ?? '')
   const [baseUrl, setBaseUrl] = useState(instance?.base_url ?? '')
   const [apiToken, setApiToken] = useState('')
-  const [timezone, setTimezone] = useState(instance?.timezone ?? 'Asia/Shanghai')
+  const [timezone, setTimezone] = useState(
+    instance?.timezone ?? 'Asia/Shanghai'
+  )
   const [connectTimeout, setConnectTimeout] = useState(
     String(instance?.connect_timeout_ms ?? 5000)
   )
@@ -891,8 +895,9 @@ function EditInstanceDialog({
   )
   const [status, setStatus] = useState(instance?.status ?? 'ACTIVE')
   if (!instance) return null
-  const baseUrlValid =
-    /^https?:\/\/[^\s/?#]+(:\d{1,5})?$/.test(baseUrl.trim().replace(/\/+$/, ''))
+  const baseUrlValid = /^https?:\/\/[^\s/?#]+(:\d{1,5})?$/.test(
+    baseUrl.trim().replace(/\/+$/, '')
+  )
   const valid =
     name.trim().length > 0 && baseUrlValid && timezone.trim().length > 0
 
@@ -900,9 +905,7 @@ function EditInstanceDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            编辑数据源 · {instance.instance_code}
-          </DialogTitle>
+          <DialogTitle>编辑数据源 · {instance.instance_code}</DialogTitle>
           <DialogDescription>
             Token 留空表示不更换；停用后同步与发现任务不再选择该实例。
           </DialogDescription>
