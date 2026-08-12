@@ -59,7 +59,7 @@ public class AutomaticPreviewScheduler {
                     .put("period_start", periodStart.toString())
                     .put("period_end", periodEnd.toString())
                     .put("requested_by", schedule.systemUserId().toString())
-                    .put("force_usage_sync", false)
+                    .put("force_usage_sync", true)
                     .put("trigger_type", "SCHEDULED");
             jobs.enqueue(schedule.tenantId(), GenerateInvoicePreviewHandler.TYPE,
                     "preview:" + schedule.profileId() + ":" + periodStart + ":" + periodEnd, payload);

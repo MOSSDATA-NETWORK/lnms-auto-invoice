@@ -56,10 +56,15 @@ public class LibrenmsHistorySyncHandler implements JobHandler {
         UUID requestedBy = requiredUuid(job.payload(), "requested_by");
         OffsetDateTime periodStart = requiredDateTime(job.payload(), "period_start");
         OffsetDateTime periodEnd = requiredDateTime(job.payload(), "period_end");
+        return sync(job.tenantId(), mappingId, periodStart, periodEnd, requestedBy, job.id());
+    }
+
+    public JsonNode sync(UUID tenantId, UUID mappingId, OffsetDateTime periodStart, OffsetDateTime periodEnd,
+                         UUID requestedBy, UUID jobId) throws Exception {
         if (!periodStart.isBefore(periodEnd)) {
             throw new IllegalArgumentException("Usage period must be a non-empty half-open interval");
         }
-        Mapping mapping = loadMapping(job.tenantId(), mappingId, periodStart, periodEnd);
+        Mapping mapping = loadMapping(tenantId, mappingId, periodStart, periodEnd);
         UUID runId = UuidV7.generate();
         jdbc.sql("""
                         INSERT INTO usage_sync_runs(
@@ -70,12 +75,12 @@ public class LibrenmsHistorySyncHandler implements JobHandler {
                             :periodStart, :periodEnd, 'RUNNING'
                         )
                         """)
-                .param("id", runId).param("tenantId", job.tenantId()).param("instanceId", mapping.instanceId())
-                .param("mappingId", mappingId).param("jobId", job.id()).param("periodStart", periodStart)
+                .param("id", runId).param("tenantId", tenantId).param("instanceId", mapping.instanceId())
+                .param("mappingId", mappingId).param("jobId", jobId).param("periodStart", periodStart)
                 .param("periodEnd", periodEnd).update();
         Instant started = Instant.now();
         try {
-            LibrenmsClientSupport.Connection connection = clients.connection(job.tenantId(), mapping.instanceId());
+            LibrenmsClientSupport.Connection connection = clients.connection(tenantId, mapping.instanceId());
             String body = connection.get("/api/v0/bills/" + mapping.billId() + "/history");
             JsonNode root = objectMapper.readTree(body);
             JsonNode history = jsonSupport.exactHistory(root, periodStart, periodEnd,
@@ -85,21 +90,21 @@ public class LibrenmsHistorySyncHandler implements JobHandler {
             String dataHash = sha256((history.toString() + "|" + mapping.id() + "|" + periodStart
                     + "|" + periodEnd + "|" + mapping.direction() + "|" + metrics.convertedUsage())
                     .getBytes(StandardCharsets.UTF_8));
-            UUID snapshotId = persistSnapshot(job.tenantId(), mapping, requestedBy, periodStart,
+            UUID snapshotId = persistSnapshot(tenantId, mapping, requestedBy, periodStart,
                     periodEnd, metrics, history, dataHash);
-            UUID fileId = archiveRaw(job.tenantId(), requestedBy, snapshotId, dataHash,
+            UUID fileId = archiveRaw(tenantId, requestedBy, snapshotId, dataHash,
                     body.getBytes(StandardCharsets.UTF_8), responseHash);
             jdbc.sql("""
                             INSERT INTO usage_snapshot_files(tenant_id, usage_snapshot_id, file_id, file_role)
                             VALUES (:tenantId, :snapshotId, :fileId, 'RAW_RESPONSE') ON CONFLICT DO NOTHING
                             """)
-                    .param("tenantId", job.tenantId()).param("snapshotId", snapshotId).param("fileId", fileId).update();
+                    .param("tenantId", tenantId).param("snapshotId", snapshotId).param("fileId", fileId).update();
             ObjectNode summary = objectMapper.createObjectNode().put("usage_snapshot_id", snapshotId.toString())
                     .put("raw_response_file_id", fileId.toString()).put("data_hash", dataHash);
-            completeRun(runId, job.tenantId(), responseHash, started, summary);
+            completeRun(runId, tenantId, responseHash, started, summary);
             return summary.put("sync_run_id", runId.toString());
         } catch (Exception exception) {
-            failRun(runId, job.tenantId(), started, exception);
+            failRun(runId, tenantId, started, exception);
             throw exception;
         }
     }
