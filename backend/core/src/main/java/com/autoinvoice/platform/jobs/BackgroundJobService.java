@@ -51,7 +51,7 @@ public class BackgroundJobService {
             return jdbc.sql("""
                             SELECT id FROM background_jobs
                             WHERE tenant_id = :tenantId AND job_type = :type AND unique_key = :uniqueKey
-                              AND status <> 'CANCELLED'
+                              AND status NOT IN ('DEAD', 'CANCELLED')
                             """)
                     .param("tenantId", tenantId)
                     .param("type", type)
@@ -68,6 +68,14 @@ public class BackgroundJobService {
         if (jobTypes.length == 0) {
             return Optional.empty();
         }
+        jdbc.sql("""
+                        UPDATE background_jobs
+                        SET status = 'DEAD', last_error_code = 'ATTEMPT_LIMIT_EXHAUSTED',
+                            last_error_message = 'Attempt limit reached while the job was leased; the worker likely crashed',
+                            leased_by = NULL, leased_until = NULL, updated_at = now()
+                        WHERE status = 'LEASED' AND leased_until < now() AND attempt_count >= max_attempts
+                        """)
+                .update();
         return jdbc.sql("""
                         WITH candidate AS (
                             SELECT id
@@ -76,6 +84,7 @@ public class BackgroundJobService {
                                     (status IN ('PENDING', 'RETRY') AND available_at <= now())
                                     OR (status = 'LEASED' AND leased_until < now())
                                   )
+                              AND attempt_count < max_attempts
                               AND job_type IN (:types)
                             ORDER BY priority DESC, created_at
                             FOR UPDATE SKIP LOCKED

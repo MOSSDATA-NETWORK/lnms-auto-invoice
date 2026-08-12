@@ -60,8 +60,8 @@ public class JobController {
         return jdbc.sql("""
                         SELECT * FROM background_jobs
                         WHERE tenant_id = :tenantId
-                          AND (:status IS NULL OR status = :status)
-                          AND (:type IS NULL OR job_type = :type)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
+                          AND (CAST(:type AS varchar) IS NULL OR job_type = :type)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", tenantId).param("status", blank(status)).param("type", blank(type))
@@ -93,7 +93,7 @@ public class JobController {
             int updated = jdbc.sql("""
                             UPDATE background_jobs
                             SET status = 'RETRY', available_at = now(), leased_by = NULL, leased_until = NULL,
-                                updated_at = now()
+                                attempt_count = 0, updated_at = now()
                             WHERE tenant_id = :tenantId AND id = :id AND status IN ('DEAD', 'RETRY')
                             """)
                     .param("tenantId", actor.tenantId()).param("id", id).update();
