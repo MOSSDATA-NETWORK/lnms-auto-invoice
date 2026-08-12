@@ -8,12 +8,14 @@ import {
   CircleDollarSign,
   GitBranch,
   Layers3,
+  Pencil,
   Plus,
   Tags,
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { customersQuery } from '@/api/customers'
+import { problemFrom } from '@/api/http'
 import {
   activateContract,
   companiesQuery,
@@ -27,8 +29,11 @@ import {
   pricingRulesQuery,
   publishPricingVersion,
   servicesQuery,
+  updateContract,
+  updateContractItem,
   validatePricingVersion,
   type Contract,
+  type ContractItem,
   type PricingVersion,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
@@ -169,6 +174,49 @@ export function ContractsPage() {
   const [tiers, setTiers] = useState<TierDraft[]>([
     { lower_bound: '0', upper_bound: '', unit_price: '' },
   ])
+  const [editingContract, setEditingContract] = useState<Contract>()
+  const [editingItem, setEditingItem] = useState<ContractItem>()
+
+  const updateContractMutation = useMutation({
+    mutationFn: ({
+      id,
+      version,
+      input,
+    }: {
+      id: string
+      version: number
+      input: Parameters<typeof updateContract>[2]
+    }) => updateContract(id, version, input),
+    onSuccess: async () => {
+      toast.success('合同已更新')
+      setEditingContract(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['contracts'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '更新合同失败')
+    },
+  })
+  const updateItemMutation = useMutation({
+    mutationFn: ({
+      id,
+      version,
+      input,
+    }: {
+      id: string
+      version: number
+      input: Parameters<typeof updateContractItem>[2]
+    }) => updateContractItem(id, version, input),
+    onSuccess: async () => {
+      toast.success('计费项已更新')
+      setEditingItem(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['contract-items'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '更新计费项失败')
+    },
+  })
 
   const selectedContract =
     contracts.data?.find((row) => row.id === selectedContractId) ??
@@ -397,6 +445,8 @@ export function ContractsPage() {
                   selectedContract && activateMutation.mutate(selectedContract)
                 }
                 activating={activateMutation.isPending}
+                onEditContract={(contract) => setEditingContract(contract)}
+                onEditItem={(item) => setEditingItem(item)}
               />
             </div>
           </TabsContent>
@@ -1255,6 +1305,24 @@ export function ContractsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ContractEditDialog
+        key={editingContract?.id ?? 'closed'}
+        contract={editingContract}
+        pending={updateContractMutation.isPending}
+        onClose={() => setEditingContract(undefined)}
+        onSubmit={(id, version, input) =>
+          updateContractMutation.mutate({ id, version, input })
+        }
+      />
+      <ItemEditDialog
+        key={editingItem?.id ?? 'closed'}
+        item={editingItem}
+        pending={updateItemMutation.isPending}
+        onClose={() => setEditingItem(undefined)}
+        onSubmit={(id, version, input) =>
+          updateItemMutation.mutate({ id, version, input })
+        }
+      />
     </>
   )
 }
@@ -1266,21 +1334,17 @@ function ContractInspector({
   onAddItem,
   onActivate,
   activating,
+  onEditContract,
+  onEditItem,
 }: {
   contract?: Contract
-  items: Array<{
-    id: string
-    contract_item_no: string
-    item_name: string
-    billing_type: string
-    effective_from: string
-    effective_to: string | null
-    status: string
-  }>
+  items: ContractItem[]
   loading: boolean
   onAddItem: () => void
   onActivate: () => void
   activating: boolean
+  onEditContract: (contract: Contract) => void
+  onEditItem: (item: ContractItem) => void
 }) {
   if (!contract) {
     return (
@@ -1301,7 +1365,16 @@ function ContractInspector({
               {contract.contract_no} · v{contract.version}
             </CardDescription>
           </div>
-          <State value={contract.status} />
+          <div className='flex shrink-0 items-center gap-2'>
+            <State value={contract.status} />
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => onEditContract(contract)}
+            >
+              <Pencil /> 编辑
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className='space-y-5'>
@@ -1338,7 +1411,17 @@ function ContractInspector({
               <div key={item.id} className='rounded-lg border p-3'>
                 <div className='flex items-center justify-between gap-3'>
                   <p className='font-medium'>{item.item_name}</p>
-                  <State value={item.status} />
+                  <div className='flex shrink-0 items-center gap-2'>
+                    <State value={item.status} />
+                    <Button
+                      size='icon'
+                      variant='ghost'
+                      aria-label='编辑计费项'
+                      onClick={() => onEditItem(item)}
+                    >
+                      <Pencil className='size-3.5' />
+                    </Button>
+                  </div>
                 </div>
                 <p className='mt-2 font-mono text-[11px] text-muted-foreground'>
                   {item.contract_item_no} · {item.billing_type}
@@ -1665,4 +1748,269 @@ function localDateTime() {
 
 function toIso(value: string) {
   return new Date(value).toISOString()
+}
+
+function ContractEditDialog({
+  contract,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  contract?: Contract
+  pending: boolean
+  onClose: () => void
+  onSubmit: (
+    id: string,
+    version: number,
+    input: {
+      contract_name?: string
+      effective_from?: string
+      effective_to?: string
+      auto_renew?: boolean
+      billing_day?: number
+      payment_terms_days?: number
+      tax_rate?: string
+      tax_inclusive?: boolean
+      notes?: string
+      reason: string
+    }
+  ) => void
+}) {
+  const [name, setName] = useState(contract?.contract_name ?? '')
+  const [effectiveFrom, setEffectiveFrom] = useState(
+    contract?.effective_from ?? ''
+  )
+  const [effectiveTo, setEffectiveTo] = useState(contract?.effective_to ?? '')
+  const [billingDay, setBillingDay] = useState(
+    String(contract?.billing_day ?? 1)
+  )
+  const [paymentTerms, setPaymentTerms] = useState(
+    String(contract?.payment_terms_days ?? 30)
+  )
+  const [taxRate, setTaxRate] = useState(contract?.tax_rate ?? '')
+  const [taxInclusive, setTaxInclusive] = useState(
+    contract?.tax_inclusive ?? false
+  )
+  const [notes, setNotes] = useState(contract?.notes ?? '')
+  if (!contract) return null
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>编辑合同 · {contract.contract_no}</DialogTitle>
+          <DialogDescription>
+            税率与账期变化会影响之后的预览计算,已审批内容自动失效。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>合同名称</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>生效日期</Label>
+            <Input
+              type='date'
+              value={effectiveFrom}
+              onChange={(e) => setEffectiveFrom(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>结束日期(可空)</Label>
+            <Input
+              type='date'
+              value={effectiveTo}
+              onChange={(e) => setEffectiveTo(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>出账日(1-28)</Label>
+            <Input
+              className='font-mono'
+              value={billingDay}
+              onChange={(e) => setBillingDay(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>付款期限(天)</Label>
+            <Input
+              className='font-mono'
+              value={paymentTerms}
+              onChange={(e) => setPaymentTerms(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>税率(如 0.06)</Label>
+            <Input
+              className='font-mono'
+              value={taxRate}
+              onChange={(e) => setTaxRate(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>含税</Label>
+            <select
+              value={taxInclusive ? 'yes' : 'no'}
+              onChange={(e) => setTaxInclusive(e.target.value === 'yes')}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='no'>未税</option>
+              <option value='yes'>含税</option>
+            </select>
+          </div>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>备注</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || name.trim().length < 2}
+            onClick={() =>
+              onSubmit(contract.id, contract.version, {
+                contract_name: name.trim(),
+                effective_from: effectiveFrom || undefined,
+                effective_to: effectiveTo || undefined,
+                billing_day: Number(billingDay) || undefined,
+                payment_terms_days: Number(paymentTerms) || undefined,
+                tax_rate: taxRate.trim() || undefined,
+                tax_inclusive: taxInclusive,
+                notes: notes.trim() || undefined,
+                reason: '在合同页编辑合同',
+              })
+            }
+          >
+            保存修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ItemEditDialog({
+  item,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  item?: ContractItem
+  pending: boolean
+  onClose: () => void
+  onSubmit: (
+    id: string,
+    version: number,
+    input: {
+      item_name?: string
+      default_quantity?: string
+      auto_bill?: boolean
+      visible_on_invoice?: boolean
+      sort_order?: number
+      status?: string
+      reason: string
+    }
+  ) => void
+}) {
+  const [name, setName] = useState(item?.item_name ?? '')
+  const [quantity, setQuantity] = useState(
+    item?.default_quantity?.toString() ?? ''
+  )
+  const [autoBill, setAutoBill] = useState(item?.auto_bill ?? true)
+  const [visible, setVisible] = useState(item?.visible_on_invoice ?? true)
+  const [sortOrder, setSortOrder] = useState(String(item?.sort_order ?? 0))
+  const [status, setStatus] = useState(item?.status ?? 'ACTIVE')
+  if (!item) return null
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>编辑计费项 · {item.contract_item_no}</DialogTitle>
+          <DialogDescription>
+            价格内容不可在此修改;调价请新建价格版本。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>计费项名称</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>默认数量</Label>
+            <Input
+              className='font-mono'
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>排序</Label>
+            <Input
+              className='font-mono'
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>自动出账</Label>
+            <select
+              value={autoBill ? 'yes' : 'no'}
+              onChange={(e) => setAutoBill(e.target.value === 'yes')}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='yes'>是</option>
+              <option value='no'>否</option>
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>账单上可见</Label>
+            <select
+              value={visible ? 'yes' : 'no'}
+              onChange={(e) => setVisible(e.target.value === 'yes')}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='yes'>是</option>
+              <option value='no'>否</option>
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>状态</Label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='ACTIVE'>ACTIVE</option>
+              <option value='DISABLED'>DISABLED</option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || name.trim().length < 2}
+            onClick={() =>
+              onSubmit(item.id, item.version, {
+                item_name: name.trim(),
+                default_quantity: quantity.trim() || undefined,
+                auto_bill: autoBill,
+                visible_on_invoice: visible,
+                sort_order: Number(sortOrder) || 0,
+                status,
+                reason: '在合同页编辑计费项',
+              })
+            }
+          >
+            保存修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }

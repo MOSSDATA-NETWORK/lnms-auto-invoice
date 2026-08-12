@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarRange, Play, ShieldCheck } from 'lucide-react'
+import { CalendarRange, Pencil, Play, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { problemFrom } from '@/api/http'
 import {
   generatePreview,
   profilesQuery,
+  updateInvoiceProfile,
   type InvoiceProfile,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
@@ -34,8 +36,30 @@ import { ConsoleHeader } from '@/features/shell/console-header'
 import { PageHeading } from '@/features/shell/page-heading'
 
 export function ProfilesPage() {
+  const queryClient = useQueryClient()
   const profiles = useQuery(profilesQuery)
   const [selected, setSelected] = useState<InvoiceProfile>()
+  const [editing, setEditing] = useState<InvoiceProfile>()
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      version,
+      input,
+    }: {
+      id: string
+      version: number
+      input: Parameters<typeof updateInvoiceProfile>[2]
+    }) => updateInvoiceProfile(id, version, input),
+    onSuccess: async () => {
+      toast.success('账单配置已更新')
+      setEditing(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['invoice-profiles'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '更新配置失败')
+    },
+  })
   const active =
     profiles.data?.filter((profile) => profile.status === 'ACTIVE').length ?? 0
   const auto =
@@ -113,14 +137,24 @@ export function ProfilesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className='text-right'>
-                      <Button
-                        size='sm'
-                        disabled={profile.status !== 'ACTIVE'}
-                        onClick={() => setSelected(profile)}
-                      >
-                        <Play />
-                        生成预览
-                      </Button>
+                      <div className='flex justify-end gap-2'>
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          onClick={() => setEditing(profile)}
+                        >
+                          <Pencil />
+                          编辑
+                        </Button>
+                        <Button
+                          size='sm'
+                          disabled={profile.status !== 'ACTIVE'}
+                          onClick={() => setSelected(profile)}
+                        >
+                          <Play />
+                          生成预览
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -132,6 +166,15 @@ export function ProfilesPage() {
       <GenerateDialog
         profile={selected}
         onClose={() => setSelected(undefined)}
+      />
+      <ProfileEditDialog
+        key={editing?.id ?? 'closed'}
+        profile={editing}
+        pending={updateMutation.isPending}
+        onClose={() => setEditing(undefined)}
+        onSubmit={(id, version, input) =>
+          updateMutation.mutate({ id, version, input })
+        }
       />
     </>
   )
@@ -253,4 +296,162 @@ function Loading() {
 function toLocalInput(value: Date) {
   const offset = value.getTimezoneOffset() * 60_000
   return new Date(value.getTime() - offset).toISOString().slice(0, 16)
+}
+
+function ProfileEditDialog({
+  profile,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  profile?: InvoiceProfile
+  pending: boolean
+  onClose: () => void
+  onSubmit: (
+    id: string,
+    version: number,
+    input: {
+      profile_name?: string
+      language?: string
+      timezone?: string
+      billing_day?: number
+      payment_terms_days?: number
+      invoice_number_rule?: string
+      auto_generate?: boolean
+      auto_submit_review?: boolean
+      auto_send?: boolean
+      status?: string
+      notes?: string
+      reason: string
+    }
+  ) => void
+}) {
+  const [name, setName] = useState(profile?.profile_name ?? '')
+  const [timezone, setTimezone] = useState(profile?.timezone ?? 'Asia/Shanghai')
+  const [billingDay, setBillingDay] = useState(
+    String(profile?.billing_day ?? 1)
+  )
+  const [paymentTerms, setPaymentTerms] = useState(
+    String(profile?.payment_terms_days ?? 30)
+  )
+  const [autoGenerate, setAutoGenerate] = useState(
+    profile?.auto_generate ?? false
+  )
+  const [autoSubmit, setAutoSubmit] = useState(
+    profile?.auto_submit_review ?? false
+  )
+  const [autoSend, setAutoSend] = useState(profile?.auto_send ?? false)
+  const [status, setStatus] = useState(profile?.status ?? 'DRAFT')
+  if (!profile) return null
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>编辑账单配置 · {profile.profile_code}</DialogTitle>
+          <DialogDescription>
+            自动化开关影响调度器;停用后不再自动生成预览。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>配置名称</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>时区</Label>
+            <Input
+              className='font-mono'
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>出账日(1-28)</Label>
+            <Input
+              className='font-mono'
+              value={billingDay}
+              onChange={(e) => setBillingDay(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>付款期限(天)</Label>
+            <Input
+              className='font-mono'
+              value={paymentTerms}
+              onChange={(e) => setPaymentTerms(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>状态</Label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='DRAFT'>DRAFT</option>
+              <option value='ACTIVE'>ACTIVE</option>
+              <option value='DISABLED'>DISABLED</option>
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>自动生成预览</Label>
+            <select
+              value={autoGenerate ? 'yes' : 'no'}
+              onChange={(e) => setAutoGenerate(e.target.value === 'yes')}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='no'>关</option>
+              <option value='yes'>开</option>
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>自动提交审核</Label>
+            <select
+              value={autoSubmit ? 'yes' : 'no'}
+              onChange={(e) => setAutoSubmit(e.target.value === 'yes')}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='no'>关</option>
+              <option value='yes'>开</option>
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>自动发送</Label>
+            <select
+              value={autoSend ? 'yes' : 'no'}
+              onChange={(e) => setAutoSend(e.target.value === 'yes')}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='no'>关</option>
+              <option value='yes'>开</option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || name.trim().length < 2}
+            onClick={() =>
+              onSubmit(profile.id, profile.version, {
+                profile_name: name.trim(),
+                timezone: timezone.trim(),
+                billing_day: Number(billingDay) || undefined,
+                payment_terms_days: Number(paymentTerms) || undefined,
+                auto_generate: autoGenerate,
+                auto_submit_review: autoSubmit,
+                auto_send: autoSend,
+                status,
+                reason: '在账单配置页编辑配置',
+              })
+            }
+          >
+            保存修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }

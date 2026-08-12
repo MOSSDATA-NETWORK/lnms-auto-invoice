@@ -6,11 +6,13 @@ import {
   Cpu,
   Network,
   PackagePlus,
+  Pencil,
   Plus,
   RadioTower,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { customersQuery } from '@/api/customers'
+import { problemFrom } from '@/api/http'
 import {
   companiesQuery,
   createProduct,
@@ -19,6 +21,7 @@ import {
   productsQuery,
   serviceResourcesQuery,
   servicesQuery,
+  updateService,
   type Service,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
@@ -122,6 +125,25 @@ export function ServicesPage() {
   const [serviceForm, setServiceForm] = useState(emptyService)
   const [productForm, setProductForm] = useState(emptyProduct)
   const [resourceForm, setResourceForm] = useState(emptyResource)
+  const [editingService, setEditingService] = useState<Service>()
+
+  const updateServiceMutation = useMutation({
+    mutationFn: ({
+      id,
+      version,
+      input,
+    }: {
+      id: string
+      version: number
+      input: Parameters<typeof updateService>[2]
+    }) => updateService(id, version, input),
+    onSuccess: async (updated) => {
+      toast.success(`业务 ${updated.service_name} 已更新`)
+      setEditingService(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['services'] })
+    },
+    onError: showMutationError,
+  })
 
   const selectedService =
     services.data?.find((row) => row.id === selectedServiceId) ??
@@ -154,6 +176,7 @@ export function ServicesPage() {
       }))
       await queryClient.invalidateQueries({ queryKey: ['products'] })
     },
+    onError: showMutationError,
   })
   const createServiceMutation = useMutation({
     mutationFn: () => {
@@ -173,6 +196,7 @@ export function ServicesPage() {
       setCreateServiceOpen(false)
       await queryClient.invalidateQueries({ queryKey: ['services'] })
     },
+    onError: showMutationError,
   })
   const createResourceMutation = useMutation({
     mutationFn: () =>
@@ -193,6 +217,7 @@ export function ServicesPage() {
         queryKey: ['service-resources', selectedService?.id],
       })
     },
+    onError: showMutationError,
   })
 
   return (
@@ -300,6 +325,7 @@ export function ServicesPage() {
             resources={resources.data ?? []}
             loading={resources.isLoading}
             onCreate={() => setCreateResourceOpen(true)}
+            onEdit={(service) => setEditingService(service)}
           />
         </div>
       </Main>
@@ -671,6 +697,15 @@ export function ServicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ServiceEditDialog
+        key={editingService?.id ?? 'closed'}
+        service={editingService}
+        pending={updateServiceMutation.isPending}
+        onClose={() => setEditingService(undefined)}
+        onSubmit={(id, version, input) =>
+          updateServiceMutation.mutate({ id, version, input })
+        }
+      />
     </>
   )
 }
@@ -680,6 +715,7 @@ function ResourceInspector({
   resources,
   loading,
   onCreate,
+  onEdit,
 }: {
   service?: Service
   resources: Array<{
@@ -693,6 +729,7 @@ function ResourceInspector({
   }>
   loading: boolean
   onCreate: () => void
+  onEdit: (service: Service) => void
 }) {
   return (
     <Card className='shadow-none'>
@@ -708,7 +745,18 @@ function ResourceInspector({
                 : '选择业务查看证据对象'}
             </CardDescription>
           </div>
-          {service && <State value={service.status} />}
+          <div className='flex shrink-0 items-center gap-2'>
+            {service && <State value={service.status} />}
+            {service && (
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => onEdit(service)}
+              >
+                <Pencil /> 编辑
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className='space-y-5'>
@@ -903,4 +951,144 @@ function localDateTime() {
 
 function toIso(value: string) {
   return new Date(value).toISOString()
+}
+
+function showMutationError(error: unknown) {
+  if (error instanceof Error && !('response' in error)) {
+    toast.error(error.message)
+    return
+  }
+  const problem = problemFrom(error)
+  toast.error(problem.detail ?? problem.title ?? '操作失败')
+}
+
+function ServiceEditDialog({
+  service,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  service?: Service
+  pending: boolean
+  onClose: () => void
+  onSubmit: (
+    id: string,
+    version: number,
+    input: {
+      service_name?: string
+      region?: string
+      datacenter?: string
+      line_name?: string
+      activated_on?: string
+      deactivated_on?: string
+      status?: string
+      notes?: string
+      reason: string
+    }
+  ) => void
+}) {
+  const [name, setName] = useState(service?.service_name ?? '')
+  const [region, setRegion] = useState(service?.region ?? '')
+  const [datacenter, setDatacenter] = useState(service?.datacenter ?? '')
+  const [lineName, setLineName] = useState(service?.line_name ?? '')
+  const [activatedOn, setActivatedOn] = useState(service?.activated_on ?? '')
+  const [deactivatedOn, setDeactivatedOn] = useState(
+    service?.deactivated_on ?? ''
+  )
+  const [status, setStatus] = useState(service?.status ?? 'ACTIVE')
+  const [notes, setNotes] = useState(service?.notes ?? '')
+  if (!service) return null
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>编辑业务 · {service.service_no}</DialogTitle>
+          <DialogDescription>
+            停用不会改写历史账单;有效期变化影响折算。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>业务名称</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>区域</Label>
+            <Input value={region} onChange={(e) => setRegion(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>机房</Label>
+            <Input
+              value={datacenter}
+              onChange={(e) => setDatacenter(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>线路</Label>
+            <Input
+              value={lineName}
+              onChange={(e) => setLineName(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>开通日期</Label>
+            <Input
+              type='date'
+              value={activatedOn}
+              onChange={(e) => setActivatedOn(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>停用日期</Label>
+            <Input
+              type='date'
+              value={deactivatedOn}
+              onChange={(e) => setDeactivatedOn(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>状态</Label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='PENDING'>PENDING</option>
+              <option value='ACTIVE'>ACTIVE</option>
+              <option value='SUSPENDED'>SUSPENDED</option>
+              <option value='ENDED'>ENDED</option>
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>备注</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || name.trim().length < 2}
+            onClick={() =>
+              onSubmit(service.id, service.version, {
+                service_name: name.trim(),
+                region: region.trim() || undefined,
+                datacenter: datacenter.trim() || undefined,
+                line_name: lineName.trim() || undefined,
+                activated_on: activatedOn || undefined,
+                deactivated_on: deactivatedOn || undefined,
+                status,
+                notes: notes.trim() || undefined,
+                reason: '在业务管理页编辑业务',
+              })
+            }
+          >
+            保存修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }

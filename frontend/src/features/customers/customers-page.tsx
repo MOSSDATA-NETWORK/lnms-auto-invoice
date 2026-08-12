@@ -33,6 +33,8 @@ import {
   updateCustomer,
   type Customer,
 } from '@/api/customers'
+import { createCompany, companiesQuery, updateCompany, type Company } from '@/api/operations'
+import { problemFrom } from '@/api/http'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -91,10 +93,56 @@ export function CustomersPage() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery)
   const customers = useQuery(customersQuery(q ?? ''))
+  const companies = useQuery(companiesQuery)
+  const companiesByCustomer = useMemo(() => {
+    const grouped = new Map<string, Company[]>()
+    for (const company of companies.data ?? []) {
+      const list = grouped.get(company.customer_id) ?? []
+      list.push(company)
+      grouped.set(company.customer_id, list)
+    }
+    return grouped
+  }, [companies.data])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Customer>()
   const [archiving, setArchiving] = useState<Customer>()
+  const [companyFor, setCompanyFor] = useState<Customer>()
+  const [editingCompany, setEditingCompany] = useState<Company>()
   const writable = can(session, 'customer.write')
+
+  const updateCompanyMutation = useMutation({
+    mutationFn: ({
+      id,
+      version,
+      input,
+    }: {
+      id: string
+      version: number
+      input: Parameters<typeof updateCompany>[2]
+    }) => updateCompany(id, version, input),
+    onSuccess: async (updated) => {
+      toast.success(`公司 ${updated.company_name} 已更新`)
+      setEditingCompany(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['companies'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '更新公司失败')
+    },
+  })
+
+  const createCompanyMutation = useMutation({
+    mutationFn: createCompany,
+    onSuccess: async (created) => {
+      toast.success(`公司 ${created.company_name} 已创建`)
+      setCompanyFor(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['companies'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '创建公司失败')
+    },
+  })
 
   const archiveMutation = useMutation({
     mutationFn: ({
@@ -142,6 +190,36 @@ export function CustomersPage() {
         ),
       },
       {
+        id: 'companies',
+        header: '公司',
+        cell: ({ row }) => {
+          const list = companiesByCustomer.get(row.original.id) ?? []
+          if (list.length === 0) {
+            return <span className='text-xs text-muted-foreground'>—</span>
+          }
+          return (
+            <div className='flex max-w-64 flex-wrap gap-1'>
+              {list.map((company) => (
+                <button
+                  key={company.id}
+                  type='button'
+                  title={`${company.company_code}(点击编辑)`}
+                  onClick={() => writable && setEditingCompany(company)}
+                  className='rounded-md transition-transform hover:scale-[1.03]'
+                >
+                  <Badge
+                    variant='secondary'
+                    className='cursor-pointer font-normal'
+                  >
+                    {company.company_name}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          )
+        },
+      },
+      {
         accessorKey: 'default_payment_terms_days',
         header: '付款期限',
         cell: ({ row }) => `${row.original.default_payment_terms_days} 天`,
@@ -173,6 +251,13 @@ export function CustomersPage() {
                   编辑
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  disabled={row.original.status === 'ARCHIVED'}
+                  onClick={() => setCompanyFor(row.original)}
+                >
+                  <Building2 />
+                  新增公司
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   variant='destructive'
                   disabled={row.original.status === 'ARCHIVED'}
                   onClick={() => setArchiving(row.original)}
@@ -185,7 +270,7 @@ export function CustomersPage() {
           ) : null,
       },
     ],
-    [writable]
+    [writable, companiesByCustomer]
   )
 
   // TanStack Table returns stable imperative helpers that React Compiler intentionally skips.
@@ -297,6 +382,22 @@ export function CustomersPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         customer={editing}
+      />
+      <CompanyDialog
+        key={companyFor?.id ?? 'closed'}
+        customer={companyFor}
+        pending={createCompanyMutation.isPending}
+        onClose={() => setCompanyFor(undefined)}
+        onSubmit={(input) => createCompanyMutation.mutate(input)}
+      />
+      <CompanyEditDialog
+        key={editingCompany?.id ?? 'closed'}
+        company={editingCompany}
+        pending={updateCompanyMutation.isPending}
+        onClose={() => setEditingCompany(undefined)}
+        onSubmit={(id, version, input) =>
+          updateCompanyMutation.mutate({ id, version, input })
+        }
       />
       <ConfirmDialog
         open={Boolean(archiving)}
@@ -551,5 +652,241 @@ function typeLabel(value: string) {
         RESELLER: '渠道商',
       } as Record<string, string>
     )[value] ?? value
+  )
+}
+
+function CompanyDialog({
+  customer,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  customer?: Customer
+  pending: boolean
+  onClose: () => void
+  onSubmit: (input: {
+    customer_id: string
+    company_code: string
+    company_name: string
+    default_currency: string
+    tax_number?: string
+    invoice_title?: string
+  }) => void
+}) {
+  const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const [taxNumber, setTaxNumber] = useState('')
+  const [invoiceTitle, setInvoiceTitle] = useState('')
+  const [currency, setCurrency] = useState('CNY')
+  const valid =
+    /^[A-Z0-9][A-Z0-9-]{2,63}$/.test(code.trim()) &&
+    name.trim().length >= 2 &&
+    /^[A-Z]{3}$/.test(currency.trim())
+
+  return (
+    <Dialog open={Boolean(customer)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>新增公司 · {customer?.customer_name}</DialogTitle>
+          <DialogDescription>
+            公司是开票与合同主体；创建后即可在业务管理中选用。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2'>
+            <Label>公司编码</Label>
+            <Input
+              placeholder='ACME-CN'
+              className='font-mono'
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>默认币种</Label>
+            <Input
+              className='font-mono'
+              value={currency}
+              onChange={(event) =>
+                setCurrency(event.target.value.toUpperCase())
+              }
+            />
+          </div>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>公司名称</Label>
+            <Input
+              placeholder='某某科技（上海）有限公司'
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>税号（可选）</Label>
+            <Input
+              className='font-mono'
+              value={taxNumber}
+              onChange={(event) => setTaxNumber(event.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>发票抬头（可选）</Label>
+            <Input
+              value={invoiceTitle}
+              onChange={(event) => setInvoiceTitle(event.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || !valid || !customer}
+            onClick={() =>
+              customer &&
+              onSubmit({
+                customer_id: customer.id,
+                company_code: code.trim(),
+                company_name: name.trim(),
+                default_currency: currency.trim(),
+                tax_number: taxNumber.trim() || undefined,
+                invoice_title: invoiceTitle.trim() || undefined,
+              })
+            }
+          >
+            创建公司
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CompanyEditDialog({
+  company,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  company?: Company
+  pending: boolean
+  onClose: () => void
+  onSubmit: (
+    id: string,
+    version: number,
+    input: {
+      company_name?: string
+      company_name_en?: string
+      address?: string
+      tax_number?: string
+      invoice_title?: string
+      default_currency?: string
+      default_tax_rate?: string
+      status?: string
+      reason: string
+    }
+  ) => void
+}) {
+  const [name, setName] = useState(company?.company_name ?? '')
+  const [nameEn, setNameEn] = useState(company?.company_name_en ?? '')
+  const [address, setAddress] = useState(company?.address ?? '')
+  const [taxNumber, setTaxNumber] = useState(company?.tax_number ?? '')
+  const [invoiceTitle, setInvoiceTitle] = useState(company?.invoice_title ?? '')
+  const [currency, setCurrency] = useState(company?.default_currency ?? 'CNY')
+  const [taxRate, setTaxRate] = useState(company?.default_tax_rate ?? '')
+  const [status, setStatus] = useState(company?.status ?? 'ACTIVE')
+  if (!company) return null
+  const valid = name.trim().length >= 2 && /^[A-Z]{3}$/.test(currency.trim())
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>编辑公司 · {company.company_code}</DialogTitle>
+          <DialogDescription>
+            税号与发票抬头会进入新开账单的公司快照；历史账单保持不变。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2'>
+            <Label>公司名称</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>英文名称</Label>
+            <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
+          </div>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>地址</Label>
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+          </div>
+          <div className='space-y-2'>
+            <Label>税号</Label>
+            <Input
+              className='font-mono'
+              value={taxNumber}
+              onChange={(e) => setTaxNumber(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>发票抬头</Label>
+            <Input
+              value={invoiceTitle}
+              onChange={(e) => setInvoiceTitle(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>默认币种</Label>
+            <Input
+              className='font-mono'
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>默认税率(如 0.06)</Label>
+            <Input
+              className='font-mono'
+              value={taxRate}
+              onChange={(e) => setTaxRate(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>状态</Label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='ACTIVE'>ACTIVE</option>
+              <option value='ARCHIVED'>ARCHIVED</option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || !valid}
+            onClick={() =>
+              onSubmit(company.id, company.version, {
+                company_name: name.trim(),
+                company_name_en: nameEn.trim() || undefined,
+                address: address.trim() || undefined,
+                tax_number: taxNumber.trim() || undefined,
+                invoice_title: invoiceTitle.trim() || undefined,
+                default_currency: currency.trim(),
+                default_tax_rate: taxRate.trim() || undefined,
+                status,
+                reason: '在客户页编辑公司资料',
+              })
+            }
+          >
+            保存修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

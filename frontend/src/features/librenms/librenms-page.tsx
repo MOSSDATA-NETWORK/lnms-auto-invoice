@@ -5,6 +5,8 @@ import {
   DatabaseZap,
   History,
   Link2,
+  Pencil,
+  Plus,
   Radar,
   ShieldAlert,
 } from 'lucide-react'
@@ -12,6 +14,7 @@ import { toast } from 'sonner'
 import {
   contractItemsQuery,
   contractsQuery,
+  createLibrenmsInstance,
   createLibrenmsMapping,
   discoverBills,
   discoveredBillsQuery,
@@ -19,11 +22,13 @@ import {
   librenmsMappingsQuery,
   servicesQuery,
   syncLibrenmsHistory,
+  updateLibrenmsInstance,
   usageSnapshotsQuery,
   verifyLibrenms,
   type LibrenmsInstance,
   type LibrenmsMapping,
 } from '@/api/operations'
+import { problemFrom } from '@/api/http'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -76,6 +81,16 @@ export function LibrenmsPage() {
   const [direction, setDirection] = useState('AGGREGATE')
   const [sourceUnit, setSourceUnit] = useState('bps')
   const [syncMapping, setSyncMapping] = useState<LibrenmsMapping>()
+  const [addOpen, setAddOpen] = useState(false)
+  const [editInstance, setEditInstance] = useState<LibrenmsInstance>()
+  const emptyInstance = {
+    instance_name: '',
+    instance_code: '',
+    base_url: '',
+    api_token: '',
+    timezone: 'Asia/Shanghai',
+  }
+  const [newInstance, setNewInstance] = useState(emptyInstance)
   const defaultPeriod = previousMonthPeriod()
   const [periodStart, setPeriodStart] = useState(defaultPeriod.start)
   const [periodEnd, setPeriodEnd] = useState(defaultPeriod.end)
@@ -144,6 +159,69 @@ export function LibrenmsPage() {
       ])
     },
   })
+  const createInstance = useMutation({
+    mutationFn: () =>
+      createLibrenmsInstance({
+        instance_name: newInstance.instance_name.trim(),
+        instance_code: newInstance.instance_code.trim(),
+        base_url: newInstance.base_url.trim().replace(/\/+$/, ''),
+        api_token: newInstance.api_token.trim(),
+        timezone: newInstance.timezone.trim(),
+      }),
+    onSuccess: async (created) => {
+      toast.success(`数据源 ${created.instance_name} 已创建`)
+      setAddOpen(false)
+      setNewInstance(emptyInstance)
+      setSelectedId(created.id)
+      await queryClient.invalidateQueries({ queryKey: ['librenms-instances'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '创建数据源失败')
+    },
+  })
+  const editInstanceMutation = useMutation({
+    mutationFn: (input: {
+      id: string
+      version: number
+      instance_name?: string
+      base_url?: string
+      api_token?: string
+      timezone?: string
+      connect_timeout_ms?: number
+      read_timeout_ms?: number
+      max_concurrency?: number
+      status?: string
+    }) =>
+      updateLibrenmsInstance(input.id, input.version, {
+        instance_name: input.instance_name,
+        base_url: input.base_url,
+        api_token: input.api_token,
+        timezone: input.timezone,
+        connect_timeout_ms: input.connect_timeout_ms,
+        read_timeout_ms: input.read_timeout_ms,
+        max_concurrency: input.max_concurrency,
+        status: input.status,
+        reason: '在 LibreNMS 工作台修改数据源',
+      }),
+    onSuccess: async (updated) => {
+      toast.success(`数据源 ${updated.instance_name} 已更新`)
+      setEditInstance(undefined)
+      await queryClient.invalidateQueries({ queryKey: ['librenms-instances'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '更新数据源失败')
+    },
+  })
+  const newInstanceValid =
+    newInstance.instance_name.trim().length > 0 &&
+    /^[A-Z0-9][A-Z0-9_-]{2,99}$/.test(newInstance.instance_code.trim()) &&
+    /^https?:\/\/[^\s/?#]+(:\d{1,5})?$/.test(
+      newInstance.base_url.trim().replace(/\/+$/, '')
+    ) &&
+    newInstance.api_token.trim().length > 0 &&
+    newInstance.timezone.trim().length > 0
   return (
     <>
       <ConsoleHeader label='librenms' />
@@ -155,14 +233,20 @@ export function LibrenmsPage() {
         />
         <div className='grid min-w-0 gap-4 xl:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]'>
           <Card className='min-w-0 shadow-none'>
-            <CardHeader>
-              <CardTitle className='flex items-center gap-2 text-base'>
-                <Cable className='size-4' />
-                数据源
-              </CardTitle>
-              <CardDescription>
-                Token 仅在服务端解密，浏览器永远看不到。
-              </CardDescription>
+            <CardHeader className='flex flex-row items-start justify-between gap-3'>
+              <div className='space-y-1.5'>
+                <CardTitle className='flex items-center gap-2 text-base'>
+                  <Cable className='size-4' />
+                  数据源
+                </CardTitle>
+                <CardDescription>
+                  Token 仅在服务端解密，浏览器永远看不到。
+                </CardDescription>
+              </div>
+              <Button size='sm' onClick={() => setAddOpen(true)}>
+                <Plus />
+                新增数据源
+              </Button>
             </CardHeader>
             <CardContent className='space-y-3'>
               {instances.isLoading ? (
@@ -173,10 +257,13 @@ export function LibrenmsPage() {
                 </p>
               ) : (
                 instances.data.map((instance) => (
-                  <button
+                  <div
                     key={instance.id}
+                    role='button'
+                    tabIndex={0}
                     onClick={() => setSelectedId(instance.id)}
-                    className={`w-full min-w-0 rounded-lg border p-4 text-left transition-colors ${effectiveId === instance.id ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'hover:bg-muted/40'}`}
+                    onKeyDown={(event) => event.key === 'Enter' && setSelectedId(instance.id)}
+                    className={`w-full min-w-0 cursor-pointer rounded-lg border p-4 text-left transition-colors ${effectiveId === instance.id ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'hover:bg-muted/40'}`}
                   >
                     <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
@@ -187,15 +274,28 @@ export function LibrenmsPage() {
                           {instance.instance_code}
                         </p>
                       </div>
-                      <Badge
-                        variant={
-                          instance.status === 'ACTIVE'
-                            ? 'default'
-                            : 'destructive'
-                        }
-                      >
-                        {instance.status}
-                      </Badge>
+                      <div className='flex shrink-0 items-center gap-1'>
+                        <Badge
+                          variant={
+                            instance.status === 'ACTIVE'
+                              ? 'default'
+                              : 'destructive'
+                          }
+                        >
+                          {instance.status}
+                        </Badge>
+                        <Button
+                          size='icon'
+                          variant='ghost'
+                          aria-label='编辑数据源'
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setEditInstance(instance)
+                          }}
+                        >
+                          <Pencil className='size-3.5' />
+                        </Button>
+                      </div>
                     </div>
                     <p className='mt-3 truncate text-xs text-muted-foreground'>
                       {instance.base_url}
@@ -204,7 +304,7 @@ export function LibrenmsPage() {
                       <span>{instance.timezone}</span>
                       <span>连续失败 {instance.consecutive_failures}</span>
                     </div>
-                  </button>
+                  </div>
                 ))
               )}
             </CardContent>
@@ -616,6 +716,101 @@ export function LibrenmsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新增 LibreNMS 数据源</DialogTitle>
+            <DialogDescription>
+              支持配置多个 LibreNMS 实例。地址仅允许协议 +
+              主机（可选端口），不能带路径；白名单外的地址会被服务端拒绝。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-4 sm:grid-cols-2'>
+            <Field label='名称'>
+              <Input
+                placeholder='上海机房 NMS'
+                value={newInstance.instance_name}
+                onChange={(event) =>
+                  setNewInstance({
+                    ...newInstance,
+                    instance_name: event.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label='编码（大写字母/数字）'>
+              <Input
+                placeholder='SH-NMS-01'
+                className='font-mono'
+                value={newInstance.instance_code}
+                onChange={(event) =>
+                  setNewInstance({
+                    ...newInstance,
+                    instance_code: event.target.value.toUpperCase(),
+                  })
+                }
+              />
+            </Field>
+            <Field label='API 地址' className='sm:col-span-2'>
+              <Input
+                placeholder='http://192.168.1.10 或 https://nms.example.com'
+                className='font-mono'
+                value={newInstance.base_url}
+                onChange={(event) =>
+                  setNewInstance({
+                    ...newInstance,
+                    base_url: event.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label='API Token' className='sm:col-span-2'>
+              <Input
+                type='password'
+                placeholder='LibreNMS → Manage API Tokens'
+                className='font-mono'
+                value={newInstance.api_token}
+                onChange={(event) =>
+                  setNewInstance({
+                    ...newInstance,
+                    api_token: event.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label='时区'>
+              <Input
+                className='font-mono'
+                value={newInstance.timezone}
+                onChange={(event) =>
+                  setNewInstance({
+                    ...newInstance,
+                    timezone: event.target.value,
+                  })
+                }
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setAddOpen(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={createInstance.isPending || !newInstanceValid}
+              onClick={() => createInstance.mutate()}
+            >
+              创建数据源
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <EditInstanceDialog
+        key={editInstance?.id ?? 'closed'}
+        instance={editInstance}
+        pending={editInstanceMutation.isPending}
+        onClose={() => setEditInstance(undefined)}
+        onSubmit={(input) => editInstanceMutation.mutate(input)}
+      />
     </>
   )
 }
@@ -656,5 +851,146 @@ function Loading({ count }: { count: number }) {
         <Skeleton key={index} className='h-12 w-full' />
       ))}
     </div>
+  )
+}
+
+function EditInstanceDialog({
+  instance,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  instance?: LibrenmsInstance
+  pending: boolean
+  onClose: () => void
+  onSubmit: (input: {
+    id: string
+    version: number
+    instance_name?: string
+    base_url?: string
+    api_token?: string
+    timezone?: string
+    connect_timeout_ms?: number
+    read_timeout_ms?: number
+    max_concurrency?: number
+    status?: string
+  }) => void
+}) {
+  const [name, setName] = useState(instance?.instance_name ?? '')
+  const [baseUrl, setBaseUrl] = useState(instance?.base_url ?? '')
+  const [apiToken, setApiToken] = useState('')
+  const [timezone, setTimezone] = useState(instance?.timezone ?? 'Asia/Shanghai')
+  const [connectTimeout, setConnectTimeout] = useState(
+    String(instance?.connect_timeout_ms ?? 5000)
+  )
+  const [readTimeout, setReadTimeout] = useState(
+    String(instance?.read_timeout_ms ?? 30000)
+  )
+  const [maxConcurrency, setMaxConcurrency] = useState(
+    String(instance?.max_concurrency ?? 4)
+  )
+  const [status, setStatus] = useState(instance?.status ?? 'ACTIVE')
+  if (!instance) return null
+  const baseUrlValid =
+    /^https?:\/\/[^\s/?#]+(:\d{1,5})?$/.test(baseUrl.trim().replace(/\/+$/, ''))
+  const valid =
+    name.trim().length > 0 && baseUrlValid && timezone.trim().length > 0
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            编辑数据源 · {instance.instance_code}
+          </DialogTitle>
+          <DialogDescription>
+            Token 留空表示不更换；停用后同步与发现任务不再选择该实例。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <Field label='名称'>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label='时区'>
+            <Input
+              className='font-mono'
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+            />
+          </Field>
+          <Field label='API 地址' className='sm:col-span-2'>
+            <Input
+              className='font-mono'
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+            />
+          </Field>
+          <Field label='新 API Token(留空不换)' className='sm:col-span-2'>
+            <Input
+              type='password'
+              className='font-mono'
+              placeholder='留空保持现有 Token'
+              value={apiToken}
+              onChange={(e) => setApiToken(e.target.value)}
+            />
+          </Field>
+          <Field label='连接超时(ms)'>
+            <Input
+              className='font-mono'
+              value={connectTimeout}
+              onChange={(e) => setConnectTimeout(e.target.value)}
+            />
+          </Field>
+          <Field label='读取超时(ms)'>
+            <Input
+              className='font-mono'
+              value={readTimeout}
+              onChange={(e) => setReadTimeout(e.target.value)}
+            />
+          </Field>
+          <Field label='并发数'>
+            <Input
+              className='font-mono'
+              value={maxConcurrency}
+              onChange={(e) => setMaxConcurrency(e.target.value)}
+            />
+          </Field>
+          <Field label='状态'>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='ACTIVE'>ACTIVE</option>
+              <option value='DISABLED'>DISABLED</option>
+            </select>
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={pending || !valid}
+            onClick={() =>
+              onSubmit({
+                id: instance.id,
+                version: instance.version,
+                instance_name: name.trim(),
+                base_url: baseUrl.trim().replace(/\/+$/, ''),
+                api_token: apiToken.trim() || undefined,
+                timezone: timezone.trim(),
+                connect_timeout_ms: Number(connectTimeout) || undefined,
+                read_timeout_ms: Number(readTimeout) || undefined,
+                max_concurrency: Number(maxConcurrency) || undefined,
+                status,
+              })
+            }
+          >
+            保存修改
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

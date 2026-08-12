@@ -65,9 +65,9 @@ type UsageSnapshot = Complete<GeneratedModel.UsageSnapshotResponse>
 export type Service = Complete<GeneratedModel.ServiceResponse>
 type Product = Complete<GeneratedModel.ProductResponse>
 type ServiceResource = Complete<GeneratedModel.ServiceResourceResponse>
-type Company = Complete<GeneratedModel.CompanyResponse>
+export type Company = Complete<GeneratedModel.CompanyResponse>
 export type Contract = Complete<GeneratedModel.ContractResponse>
-type ContractItem = Complete<GeneratedModel.ContractItemResponse>
+export type ContractItem = Complete<GeneratedModel.ContractItemResponse>
 type PricingRule = Complete<GeneratedModel.PricingRuleResponse>
 export type PricingVersion = Complete<GeneratedModel.PricingVersionResponse>
 type PricingRuleDetail = Complete<GeneratedModel.PricingRuleDetail>
@@ -389,6 +389,49 @@ export async function recordPayment(input: {
       { headers: { 'Idempotency-Key': idempotencyKey('payment') } }
     )
   ).data
+}
+
+export interface CreateCompanyInput {
+  customer_id: string
+  company_code: string
+  company_name: string
+  default_currency: string
+  tax_number?: string
+  invoice_title?: string
+}
+
+export async function createCompany(input: CreateCompanyInput) {
+  return (
+    await api.post(
+      '/companies',
+      { ...input, reason: '在客户页新增客户公司' },
+      { headers: { 'Idempotency-Key': idempotencyKey('company') } }
+    )
+  ).data as Company
+}
+
+export interface CreateLibrenmsInstanceInput {
+  instance_code: string
+  instance_name: string
+  base_url: string
+  api_token: string
+  timezone: string
+}
+
+export async function createLibrenmsInstance(input: CreateLibrenmsInstanceInput) {
+  return (
+    await api.post(
+      '/librenms/instances',
+      {
+        ...input,
+        connect_timeout_ms: 5000,
+        read_timeout_ms: 30000,
+        max_concurrency: 4,
+        reason: '在 LibreNMS 工作台新增数据源',
+      },
+      { headers: { 'Idempotency-Key': idempotencyKey('librenms-create') } }
+    )
+  ).data as LibrenmsInstance
 }
 
 export async function discoverBills(instance: LibrenmsInstance) {
@@ -1173,4 +1216,101 @@ export function money(minor: Decimal.Value, currency: string) {
     JPY: '¥',
   }
   return `${symbols[currency] ?? currency + ' '}${grouped}${fraction ? `.${fraction}` : ''}`
+}
+
+async function patchEntity<T>(path: string, body: unknown, version: number): Promise<T> {
+  return (
+    await api.patch(path, body, {
+      headers: { 'If-Match': `W/"${version}"` },
+    })
+  ).data as T
+}
+
+export function updateCompany(id: string, version: number, input: {
+  company_name?: string
+  company_name_en?: string
+  country_region?: string
+  address?: string
+  tax_number?: string
+  invoice_title?: string
+  default_currency?: string
+  default_tax_rate?: string
+  status?: string
+  reason: string
+}) {
+  return patchEntity<Company>(`/companies/${id}`, input, version)
+}
+
+export function updateService(id: string, version: number, input: {
+  service_name?: string
+  region?: string
+  datacenter?: string
+  line_name?: string
+  activated_on?: string
+  deactivated_on?: string
+  status?: string
+  notes?: string
+  reason: string
+}) {
+  return patchEntity<Service>(`/services/${id}`, input, version)
+}
+
+export function updateContract(id: string, version: number, input: {
+  contract_name?: string
+  effective_from?: string
+  effective_to?: string
+  auto_renew?: boolean
+  billing_day?: number
+  payment_terms_days?: number
+  tax_rate?: string
+  tax_inclusive?: boolean
+  notes?: string
+  reason: string
+}) {
+  return patchEntity<Contract>(`/contracts/${id}`, input, version)
+}
+
+export function updateContractItem(id: string, version: number, input: {
+  item_name?: string
+  effective_to?: string
+  default_quantity?: string
+  auto_bill?: boolean
+  visible_on_invoice?: boolean
+  sort_order?: number
+  status?: string
+  reason: string
+}) {
+  return patchEntity<ContractItem>(`/contract-items/${id}`, input, version)
+}
+
+export function updateInvoiceProfile(id: string, version: number, input: {
+  profile_name?: string
+  template_id?: string
+  language?: string
+  timezone?: string
+  billing_day?: number
+  payment_terms_days?: number
+  invoice_number_rule?: string
+  auto_generate?: boolean
+  auto_submit_review?: boolean
+  auto_send?: boolean
+  status?: string
+  notes?: string
+  reason: string
+}) {
+  return patchEntity<InvoiceProfile>(`/invoice-profiles/${id}`, input, version)
+}
+
+export function updateLibrenmsInstance(id: string, version: number, input: {
+  instance_name?: string
+  base_url?: string
+  api_token?: string
+  timezone?: string
+  connect_timeout_ms?: number
+  read_timeout_ms?: number
+  max_concurrency?: number
+  status?: string
+  reason: string
+}) {
+  return patchEntity<LibrenmsInstance>(`/librenms/instances/${id}`, input, version)
 }
