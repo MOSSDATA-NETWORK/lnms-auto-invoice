@@ -65,19 +65,23 @@ public class ReceivablesReportController {
                             WHERE invoice.tenant_id = :tenantId
                               AND invoice.document_status IN ('CONFIRMED','SENT','REPLACED')
                             GROUP BY invoice.id
+                        ),
+                        bucketed AS (
+                            SELECT currency_code, outstanding_minor,
+                                   CASE
+                                       WHEN due_date >= :asOf THEN 'CURRENT'
+                                       WHEN :asOf - due_date BETWEEN 1 AND 30 THEN '1_30'
+                                       WHEN :asOf - due_date BETWEEN 31 AND 60 THEN '31_60'
+                                       WHEN :asOf - due_date BETWEEN 61 AND 90 THEN '61_90'
+                                       ELSE 'OVER_90'
+                                   END AS bucket
+                            FROM invoice_balance
+                            WHERE outstanding_minor > 0
                         )
-                        SELECT currency_code,
-                               CASE
-                                   WHEN due_date >= :asOf THEN 'CURRENT'
-                                   WHEN :asOf - due_date BETWEEN 1 AND 30 THEN '1_30'
-                                   WHEN :asOf - due_date BETWEEN 31 AND 60 THEN '31_60'
-                                   WHEN :asOf - due_date BETWEEN 61 AND 90 THEN '61_90'
-                                   ELSE 'OVER_90'
-                               END AS bucket,
+                        SELECT currency_code, bucket,
                                sum(outstanding_minor) AS outstanding_minor,
                                count(*) AS invoice_count
-                        FROM invoice_balance
-                        WHERE outstanding_minor > 0
+                        FROM bucketed
                         GROUP BY currency_code, bucket
                         ORDER BY currency_code,
                             CASE bucket WHEN 'CURRENT' THEN 0 WHEN '1_30' THEN 1 WHEN '31_60' THEN 2

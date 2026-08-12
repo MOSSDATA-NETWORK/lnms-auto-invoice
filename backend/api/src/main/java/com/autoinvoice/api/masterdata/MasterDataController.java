@@ -70,9 +70,9 @@ public class MasterDataController {
         return jdbc.sql("""
                         SELECT * FROM companies
                         WHERE tenant_id = :tenantId
-                          AND (:customerId IS NULL OR customer_id = :customerId)
-                          AND (:status IS NULL OR status = :status)
-                          AND (:query IS NULL OR company_code ILIKE :likeQuery OR company_name ILIKE :likeQuery)
+                          AND (CAST(:customerId AS uuid) IS NULL OR customer_id = :customerId)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
+                          AND (CAST(:query AS varchar) IS NULL OR company_code ILIKE :likeQuery OR company_name ILIKE :likeQuery)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", user(authentication).tenantId()).param("customerId", customerId)
@@ -233,7 +233,7 @@ public class MasterDataController {
     @PreAuthorize("hasAuthority('customer.read')")
     public List<ProductResponse> products(Authentication authentication,
                                           @RequestParam(required = false) String status) {
-        return jdbc.sql("SELECT * FROM products WHERE tenant_id = :tenantId AND (:status IS NULL OR status = :status) ORDER BY product_code")
+        return jdbc.sql("SELECT * FROM products WHERE tenant_id = :tenantId AND (CAST(:status AS varchar) IS NULL OR status = :status) ORDER BY product_code")
                 .param("tenantId", user(authentication).tenantId()).param("status", blank(status))
                 .query(this::mapProduct).list();
     }
@@ -271,9 +271,9 @@ public class MasterDataController {
                                           @RequestParam(defaultValue = "50") int limit) {
         return jdbc.sql("""
                         SELECT * FROM services WHERE tenant_id = :tenantId
-                          AND (:customerId IS NULL OR customer_id = :customerId)
-                          AND (:status IS NULL OR status = :status)
-                          AND (:query IS NULL OR service_no ILIKE :likeQuery OR service_name ILIKE :likeQuery)
+                          AND (CAST(:customerId AS uuid) IS NULL OR customer_id = :customerId)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
+                          AND (CAST(:query AS varchar) IS NULL OR service_no ILIKE :likeQuery OR service_name ILIKE :likeQuery)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", user(authentication).tenantId()).param("customerId", customerId)
@@ -412,9 +412,9 @@ public class MasterDataController {
                                             @RequestParam(defaultValue = "50") int limit) {
         return jdbc.sql("""
                         SELECT * FROM contracts WHERE tenant_id = :tenantId
-                          AND (:customerId IS NULL OR customer_id = :customerId)
-                          AND (:status IS NULL OR status = :status)
-                          AND (:query IS NULL OR contract_no ILIKE :likeQuery OR contract_name ILIKE :likeQuery)
+                          AND (CAST(:customerId AS uuid) IS NULL OR customer_id = :customerId)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
+                          AND (CAST(:query AS varchar) IS NULL OR contract_no ILIKE :likeQuery OR contract_name ILIKE :likeQuery)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", user(authentication).tenantId()).param("customerId", customerId)

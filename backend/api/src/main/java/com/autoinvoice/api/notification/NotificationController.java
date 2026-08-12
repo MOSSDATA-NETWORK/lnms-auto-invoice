@@ -189,8 +189,8 @@ public class NotificationController {
                                sent_at, created_at, updated_at
                         FROM notification_logs
                         WHERE tenant_id = :tenantId
-                          AND (:invoiceId IS NULL OR invoice_id = :invoiceId)
-                          AND (:status IS NULL OR status = :status)
+                          AND (CAST(:invoiceId AS uuid) IS NULL OR invoice_id = :invoiceId)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", principal(authentication).tenantId()).param("invoiceId", invoiceId)

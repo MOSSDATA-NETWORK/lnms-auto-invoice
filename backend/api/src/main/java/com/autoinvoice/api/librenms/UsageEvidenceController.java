@@ -42,7 +42,7 @@ public class UsageEvidenceController {
         return jdbc.sql("""
                         SELECT snapshot.* FROM usage_snapshots snapshot
                         WHERE snapshot.tenant_id = :tenantId
-                          AND (:contractItemId IS NULL OR snapshot.contract_item_id = :contractItemId)
+                          AND (CAST(:contractItemId AS uuid) IS NULL OR snapshot.contract_item_id = :contractItemId)
                         ORDER BY snapshot.created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", user(authentication).tenantId()).param("contractItemId", contractItemId)

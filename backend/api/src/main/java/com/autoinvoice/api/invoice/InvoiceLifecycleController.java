@@ -75,7 +75,7 @@ public class InvoiceLifecycleController {
                         SELECT id, preview_number, customer_id, company_id, period_start, period_end,
                                issue_date, due_date, currency_code, total_minor, status, approval_revision, version
                         FROM invoice_previews
-                        WHERE tenant_id = :tenantId AND (:status IS NULL OR status = :status)
+                        WHERE tenant_id = :tenantId AND (CAST(:status AS varchar) IS NULL OR status = :status)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", tenantId).param("status", blankToNull(status))
@@ -314,7 +314,7 @@ public class InvoiceLifecycleController {
                                due_date, currency_code, total_minor, document_status, send_status, payment_status,
                                created_at, version FROM invoices
                         WHERE tenant_id = :tenantId
-                          AND (:documentStatus IS NULL OR document_status = :documentStatus)
+                          AND (CAST(:documentStatus AS varchar) IS NULL OR document_status = :documentStatus)
                         ORDER BY created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", tenantId).param("documentStatus", blankToNull(documentStatus))

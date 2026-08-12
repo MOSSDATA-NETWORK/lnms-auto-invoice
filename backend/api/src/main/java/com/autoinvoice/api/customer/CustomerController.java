@@ -61,9 +61,9 @@ public class CustomerController {
         List<CustomerResponse> rows = jdbc.sql("""
                         SELECT * FROM customers
                         WHERE tenant_id = :tenantId
-                          AND (:afterId IS NULL OR id > :afterId)
-                          AND (:status IS NULL OR status = :status)
-                          AND (:query IS NULL OR customer_no ILIKE :likeQuery OR customer_name ILIKE :likeQuery)
+                          AND (CAST(:afterId AS uuid) IS NULL OR id > :afterId)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
+                          AND (CAST(:query AS varchar) IS NULL OR customer_no ILIKE :likeQuery OR customer_name ILIKE :likeQuery)
                         ORDER BY id
                         LIMIT :fetchLimit
                         """)

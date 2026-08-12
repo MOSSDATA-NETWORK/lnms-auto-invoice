@@ -70,8 +70,8 @@ public class InvoiceProfileController {
                                       @RequestParam(required = false) String status) {
         return jdbc.sql("""
                         SELECT * FROM invoice_profiles WHERE tenant_id = :tenantId
-                          AND (:customerId IS NULL OR customer_id = :customerId)
-                          AND (:status IS NULL OR status = :status)
+                          AND (CAST(:customerId AS uuid) IS NULL OR customer_id = :customerId)
+                          AND (CAST(:status AS varchar) IS NULL OR status = :status)
                         ORDER BY profile_code
                         """)
                 .param("tenantId", user(authentication).tenantId()).param("customerId", customerId)

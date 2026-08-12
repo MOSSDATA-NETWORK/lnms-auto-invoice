@@ -68,8 +68,8 @@ public class ImportController {
                         FROM import_jobs job
                         JOIN files file ON file.tenant_id = job.tenant_id AND file.id = job.source_file_id
                         WHERE job.tenant_id = :tenantId
-                          AND (:status IS NULL OR job.status = :status)
-                          AND (:importType IS NULL OR job.import_type = :importType)
+                          AND (CAST(:status AS varchar) IS NULL OR job.status = :status)
+                          AND (CAST(:importType AS varchar) IS NULL OR job.import_type = :importType)
                         ORDER BY job.created_at DESC LIMIT :limit
                         """)
                 .param("tenantId", principal(authentication).tenantId()).param("status", blank(status))

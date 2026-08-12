@@ -285,7 +285,7 @@ public class PaymentService {
                                  AND company.customer_id = customer.id AND company.id = :companyId
                             JOIN currencies currency ON currency.code = :currency AND currency.enabled
                             WHERE customer.tenant_id = :tenantId AND customer.id = :customerId
-                              AND (:companyId IS NULL OR company.id IS NOT NULL)
+                              AND (CAST(:companyId AS uuid) IS NULL OR company.id IS NOT NULL)
                         )
                         """)
                 .param("tenantId", tenantId).param("customerId", customerId).param("companyId", companyId)

@@ -61,7 +61,7 @@ public class PricingController {
     @PreAuthorize("hasAnyAuthority('customer.read','contract.write','pricing.publish')")
     public List<PricingRuleResponse> rules(Authentication authentication,
                                            @RequestParam(required = false) String status) {
-        return jdbc.sql("SELECT * FROM pricing_rules WHERE tenant_id = :tenantId AND (:status IS NULL OR status = :status) ORDER BY rule_code")
+        return jdbc.sql("SELECT * FROM pricing_rules WHERE tenant_id = :tenantId AND (CAST(:status AS varchar) IS NULL OR status = :status) ORDER BY rule_code")
                 .param("tenantId", user(authentication).tenantId()).param("status", blank(status))
                 .query(this::mapRule).list();
     }
