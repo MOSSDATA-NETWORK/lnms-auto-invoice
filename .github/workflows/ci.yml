@@ -73,4 +73,6 @@ jobs:
       - run: docker build -t auto-invoice-api-ci -f backend/api/Dockerfile .
       - run: docker build -t auto-invoice-worker-ci -f backend/worker/Dockerfile .
       - run: docker build -t auto-invoice-web-ci -f frontend/Dockerfile .
-      - run: docker run --rm -e AUTO_INVOICE_TRUSTED_PROXY_CIDR=192.0.2.1/32 auto-invoice-web-ci nginx -t
+      # Mirror the Compose mounts: the image runs read-only as nginx and
+      # expects tmpfs at these paths (nginx -t writes its pid under /var/run).
+      - run: docker run --rm --read-only --tmpfs /etc/nginx/conf.d:size=1m,mode=1777 --tmpfs /var/cache/nginx:size=32m,mode=1777 --tmpfs /var/run:size=1m,mode=1777 --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777 -e AUTO_INVOICE_TRUSTED_PROXY_CIDR=192.0.2.1/32 auto-invoice-web-ci nginx -t
