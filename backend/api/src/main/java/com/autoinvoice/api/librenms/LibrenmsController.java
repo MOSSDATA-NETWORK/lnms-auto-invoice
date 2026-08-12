@@ -27,6 +27,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -109,6 +110,53 @@ public class LibrenmsController {
                             request.reason(), servletRequest);
                     return ResponseEntity.status(201).eTag(VersionEtag.format(0)).body(created);
                 });
+    }
+
+    @PatchMapping("/{instanceId}")
+    @PreAuthorize("hasAuthority('system.admin')")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<InstanceResponse> update(Authentication authentication, @PathVariable UUID instanceId,
+                                                   @RequestHeader(HttpHeaders.IF_MATCH) String ifMatch,
+                                                   @Valid @RequestBody InstanceUpdateRequest request,
+                                                   HttpServletRequest servletRequest) {
+        AuthenticatedUser actor = principal(authentication);
+        InstanceResponse before = findInstance(actor.tenantId(), instanceId);
+        long version = VersionEtag.parse(ifMatch);
+        String baseUrl = request.baseUrl() == null ? null : allowedBaseUrl(request.baseUrl());
+        String ciphertext = request.apiToken() == null ? null
+                : secretCipher.encrypt(request.apiToken(), actor.tenantId(), "librenms-instance:" + instanceId);
+        if (request.status() != null && !List.of("ACTIVE", "DISABLED").contains(request.status())) {
+            throw new DomainException("LIBRENMS_INSTANCE_STATE_INVALID",
+                    "Instance status can only be set to ACTIVE or DISABLED", 422,
+                    Map.of("status", request.status()));
+        }
+        int changed = jdbc.sql("""
+                        UPDATE librenms_instances SET
+                            instance_name = COALESCE(:name, instance_name),
+                            base_url = COALESCE(:baseUrl, base_url),
+                            api_token_ciphertext = COALESCE(:token, api_token_ciphertext),
+                            timezone = COALESCE(:timezone, timezone),
+                            connect_timeout_ms = COALESCE(:connectTimeout, connect_timeout_ms),
+                            read_timeout_ms = COALESCE(:readTimeout, read_timeout_ms),
+                            max_concurrency = COALESCE(:maxConcurrency, max_concurrency),
+                            status = COALESCE(:status, status),
+                            consecutive_failures = CASE WHEN :status = 'ACTIVE' THEN 0 ELSE consecutive_failures END,
+                            updated_at = now(), version = version + 1
+                        WHERE tenant_id = :tenantId AND id = :id AND version = :version
+                        """)
+                .param("name", request.instanceName()).param("baseUrl", baseUrl)
+                .param("token", ciphertext).param("timezone", request.timezone())
+                .param("connectTimeout", request.connectTimeoutMs()).param("readTimeout", request.readTimeoutMs())
+                .param("maxConcurrency", request.maxConcurrency()).param("status", request.status())
+                .param("tenantId", actor.tenantId()).param("id", instanceId).param("version", version).update();
+        if (changed != 1) {
+            throw new DomainException("VERSION_CONFLICT", "LibreNMS instance was modified by another request", 409,
+                    Map.of("expected_version", version));
+        }
+        InstanceResponse after = findInstance(actor.tenantId(), instanceId);
+        record(actor, "librenms.instance.updated", "librenms_instance", instanceId, before, after,
+                request.reason(), servletRequest);
+        return ResponseEntity.ok().eTag(VersionEtag.format(after.version())).body(after);
     }
 
     @PostMapping("/{instanceId}/verify")
@@ -416,6 +464,13 @@ public class LibrenmsController {
             @NotBlank String timezone, @Min(100) @Max(60_000) int connectTimeoutMs,
             @Min(500) @Max(300_000) int readTimeoutMs, @Min(1) @Max(100) int maxConcurrency,
             @NotBlank String reason) {
+    }
+
+    public record InstanceUpdateRequest(
+            String instanceName, String baseUrl, String apiToken, String timezone,
+            @Min(100) @Max(60_000) Integer connectTimeoutMs,
+            @Min(500) @Max(300_000) Integer readTimeoutMs, @Min(1) @Max(100) Integer maxConcurrency,
+            String status, @NotBlank String reason) {
     }
 
     public record MappingCreateRequest(long librenmsBillId, @NotNull UUID customerId, @NotNull UUID companyId,

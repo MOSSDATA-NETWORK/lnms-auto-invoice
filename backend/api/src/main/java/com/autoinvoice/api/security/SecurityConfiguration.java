@@ -10,6 +10,8 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -89,10 +91,30 @@ public class SecurityConfiguration {
                                 "/api/v1/template-versions/*/publish",
                                 "/api/v1/invoice-templates/*/rollback")
                         .access(mfaAuthorizationManager)
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/operations/settings")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/operations/settings",
+                                "/api/v1/librenms/instances/**")
                         .access(mfaAuthorizationManager)
                         .anyRequest().authenticated())
-                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new HttpStatusEntryPoint(UNAUTHORIZED)))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            boolean mfaMissing = SecurityContextHolder.getContext().getAuthentication()
+                                    instanceof Authentication authentication
+                                    && authentication.getPrincipal() instanceof AuthenticatedUser user
+                                    && user.enabled()
+                                    && !(user.mfaEnabled() && user.mfaVerified());
+                            response.setStatus(403);
+                            response.setContentType("application/problem+json");
+                            response.setCharacterEncoding("UTF-8");
+                            String code = mfaMissing ? "MFA_REQUIRED" : "FORBIDDEN";
+                            String detail = mfaMissing
+                                    ? "此操作需要先启用并通过 TOTP MFA 验证：请在「系统管理」页完成 MFA 注册后重新登录"
+                                    : "没有执行此操作的权限";
+                            response.getWriter().write("""
+                                    {"type":"https://auto-invoice.example/problems/%s","title":"Forbidden","status":403,"detail":"%s","instance":"%s","code":"%s"}
+                                    """.formatted(code.toLowerCase().replace('_', '-'), detail,
+                                    request.getRequestURI(), code));
+                        }))
                 .logout(logout -> logout.disable())
                 .addFilterAfter(tenantContextFilter, org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class)
                 .addFilterAfter(passwordChangeRequiredFilter, TenantContextFilter.class)

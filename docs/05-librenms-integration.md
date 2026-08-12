@@ -15,9 +15,10 @@ LibreNMS 负责设备、端口、采样、Bill、Bill History、95 值和流量�
 
 Token 只返回遮罩值，禁止写入日志。
 
-数据源 `base_url` 必须是根路径 HTTP(S) origin，禁止用户名密码、查询参数、片段和非根路径。部署通过
+数据源 `base_url` 必须是根路径 HTTP(S) origin，禁止用户名密码、查询参数、片段和非根路径。部署可通过
 `LIBRENMS_ALLOWED_ORIGINS` 配置逗号分隔的 exact-origin allowlist；协议、规范化主机和非默认端口必须精确匹配，
-显式 `http://host:80` 与 `https://host:443` 会归一化为无端口的默认 origin。空 allowlist 默认拒绝所有目标。API 在保存数据源前校验并保存规范化 origin，
+显式 `http://host:80` 与 `https://host:443` 会归一化为无端口的默认 origin。**空 allowlist 表示自助模式**：实例创建本身即审批（需 `system.admin` + MFA），注册实例的 origin 即允许目标。
+无论是否配置 allowlist，loopback 与 link-local（含云元数据地址）一律拒绝。API 在保存数据源前校验并保存规范化 origin，
 Sync Worker 在每次创建 HTTP 客户端前重新校验数据库中的 origin，以防 API 与 Worker 配置漂移或旧数据绕过。
 
 ## 3. 官方 API 边界

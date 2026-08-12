@@ -28,18 +28,30 @@ public class LibrenmsOriginPolicy {
     }
 
     public URI requireAllowed(String rawOrigin) {
-        if (allowedOrigins.isEmpty()) {
-            throw new DomainException("LIBRENMS_ORIGINS_NOT_CONFIGURED",
-                    "LibreNMS outbound connections are disabled until an origin allowlist is configured", 503,
-                    Map.of());
-        }
         URI origin = canonicalOrigin(rawOrigin);
-        if (!allowedOrigins.contains(origin.toString())) {
+        if (isBlockedInfrastructure(origin.getHost())) {
+            throw new DomainException("LIBRENMS_ORIGIN_NOT_ALLOWED",
+                    "LibreNMS base URL must not target loopback or link-local infrastructure addresses", 422,
+                    Map.of("origin", origin.toString()));
+        }
+        if (!allowedOrigins.isEmpty() && !allowedOrigins.contains(origin.toString())) {
             throw new DomainException("LIBRENMS_ORIGIN_NOT_ALLOWED",
                     "LibreNMS base URL is not present in the configured origin allowlist", 422,
                     Map.of("origin", origin.toString()));
         }
         return origin;
+    }
+
+    // Cloud metadata and loopback are never legitimate LibreNMS targets, even
+    // when the static allowlist is disabled and any registered instance is trusted.
+    private boolean isBlockedInfrastructure(String host) {
+        String value = host.toLowerCase(Locale.ROOT);
+        return "localhost".equals(value)
+                || value.startsWith("127.")
+                || "0.0.0.0".equals(value)
+                || value.startsWith("169.254.")
+                || "[::1]".equals(value)
+                || value.startsWith("[fe80");
     }
 
     private String configuredOrigin(String value) {
