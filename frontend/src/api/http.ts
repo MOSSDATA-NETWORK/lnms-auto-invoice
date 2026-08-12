@@ -9,8 +9,22 @@ export const api = axios.create({
   headers: { Accept: 'application/json' },
 })
 
+// crypto.randomUUID requires a secure context (HTTPS or localhost); plain-HTTP
+// deployments still have crypto.getRandomValues.
+function randomId(): string {
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`
+}
+
 api.interceptors.request.use((config) => {
-  config.headers.set('X-Request-Id', crypto.randomUUID())
+  config.headers.set('X-Request-Id', randomId())
   return config
 })
 
@@ -63,5 +77,5 @@ export async function ensureCsrf(): Promise<void> {
 }
 
 export function idempotencyKey(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`
+  return `${prefix}-${randomId()}`
 }
