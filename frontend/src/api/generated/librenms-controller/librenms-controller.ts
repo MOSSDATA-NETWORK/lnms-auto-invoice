@@ -29,6 +29,7 @@ import type {
   DiscoveredBillResponse,
   HistorySyncRequest,
   InstanceResponse,
+  InstanceUpdateRequest,
   JobAccepted,
   MappingCreateRequest,
   MappingResponse,
@@ -575,6 +576,65 @@ const {mutation: mutationOptions} = options ?
         TContext
       > => {
       return useMutation(getDiscoverMutationOptions(options), queryClient);
+    }
+    export const update1 = (
+    instanceId: string,
+    instanceUpdateRequest: InstanceUpdateRequest,
+ signal?: AbortSignal
+) => {
+
+
+      return apiMutator<InstanceResponse>(
+      {url: `/api/v1/librenms/instances/${instanceId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: instanceUpdateRequest, signal
+    },
+      );
+    }
+
+
+
+
+export const getUpdate1MutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update1>>, TError,{instanceId: string;data: InstanceUpdateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof update1>>, TError,{instanceId: string;data: InstanceUpdateRequest}, TContext> => {
+
+const mutationKey = ['update1'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof update1>>, {instanceId: string;data: InstanceUpdateRequest}> = (props) => {
+          const {instanceId,data} = props ?? {};
+
+          return  update1(instanceId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type Update1MutationResult = NonNullable<Awaited<ReturnType<typeof update1>>>
+    export type Update1MutationBody = InstanceUpdateRequest
+    export type Update1MutationError = unknown
+
+    export const useUpdate1 = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update1>>, TError,{instanceId: string;data: InstanceUpdateRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof update1>>,
+        TError,
+        {instanceId: string;data: InstanceUpdateRequest},
+        TContext
+      > => {
+      return useMutation(getUpdate1MutationOptions(options), queryClient);
     }
     export const discovered = (
     instanceId: string,

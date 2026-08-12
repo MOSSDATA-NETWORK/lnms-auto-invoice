@@ -64,6 +64,7 @@ export * from './importDetail';
 export * from './importErrorResponse';
 export * from './importResponse';
 export * from './instanceResponse';
+export * from './instanceUpdateRequest';
 export * from './invoiceAdjustment';
 export * from './invoiceDetail';
 export * from './invoiceFile';

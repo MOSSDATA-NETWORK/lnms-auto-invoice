@@ -463,7 +463,7 @@ export function useGet<TData = Awaited<ReturnType<typeof get>>, TError = unknown
 
 
 
-export const update1 = (
+export const update2 = (
     id: string,
     profileUpdateRequest: ProfileUpdateRequest,
  signal?: AbortSignal
@@ -481,11 +481,11 @@ export const update1 = (
 
 
 
-export const getUpdate1MutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update1>>, TError,{id: string;data: ProfileUpdateRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof update1>>, TError,{id: string;data: ProfileUpdateRequest}, TContext> => {
+export const getUpdate2MutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update2>>, TError,{id: string;data: ProfileUpdateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof update2>>, TError,{id: string;data: ProfileUpdateRequest}, TContext> => {
 
-const mutationKey = ['update1'];
+const mutationKey = ['update2'];
 const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -495,10 +495,10 @@ const {mutation: mutationOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof update1>>, {id: string;data: ProfileUpdateRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof update2>>, {id: string;data: ProfileUpdateRequest}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  update1(id,data,)
+          return  update2(id,data,)
         }
 
 
@@ -508,19 +508,19 @@ const {mutation: mutationOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type Update1MutationResult = NonNullable<Awaited<ReturnType<typeof update1>>>
-    export type Update1MutationBody = ProfileUpdateRequest
-    export type Update1MutationError = unknown
+    export type Update2MutationResult = NonNullable<Awaited<ReturnType<typeof update2>>>
+    export type Update2MutationBody = ProfileUpdateRequest
+    export type Update2MutationError = unknown
 
-    export const useUpdate1 = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update1>>, TError,{id: string;data: ProfileUpdateRequest}, TContext>, }
+    export const useUpdate2 = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update2>>, TError,{id: string;data: ProfileUpdateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof update1>>,
+        Awaited<ReturnType<typeof update2>>,
         TError,
         {id: string;data: ProfileUpdateRequest},
         TContext
       > => {
-      return useMutation(getUpdate1MutationOptions(options), queryClient);
+      return useMutation(getUpdate2MutationOptions(options), queryClient);
     }
     export const removeAssignment = (
     profileId: string,
