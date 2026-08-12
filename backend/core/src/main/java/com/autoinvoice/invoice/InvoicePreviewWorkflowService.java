@@ -441,7 +441,9 @@ public class InvoicePreviewWorkflowService {
     private Preview lockPreview(UUID tenantId, UUID previewId, long expectedVersion) {
         Preview preview = jdbc.sql("""
                         SELECT id, tenant_id, approval_workflow_version_id, status, approval_revision, version,
-                               jsonb_array_length(anomaly_json) AS anomaly_count, render_model_json
+                               (SELECT count(*)::int FROM jsonb_array_elements(anomaly_json) AS anomaly
+                                WHERE COALESCE((anomaly ->> 'blocking')::boolean, TRUE)) AS anomaly_count,
+                               render_model_json
                         FROM invoice_previews
                         WHERE tenant_id = :tenantId AND id = :previewId FOR UPDATE
                         """)
