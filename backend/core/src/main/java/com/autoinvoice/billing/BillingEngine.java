@@ -45,12 +45,15 @@ public final class BillingEngine {
             default -> throw new DomainException("UNSUPPORTED_BILLING_TYPE", "Unsupported billing type");
         }
 
-        BigDecimal afterFloor = request.minimumCharge() == null
-                ? gross
-                : gross.max(request.minimumCharge());
-        BigDecimal afterCap = request.maximumCharge() == null
-                ? afterFloor
-                : afterFloor.min(request.maximumCharge());
+        BigDecimal afterCap = BigDecimal.ZERO;
+        if (prorationFactor.signum() > 0) {
+            BigDecimal afterFloor = request.minimumCharge() == null
+                    ? gross
+                    : gross.max(request.minimumCharge());
+            afterCap = request.maximumCharge() == null
+                    ? afterFloor
+                    : afterFloor.min(request.maximumCharge());
+        }
 
         BigDecimal discount = afterCap.multiply(zeroIfNull(request.discountRate()));
         BigDecimal afterDiscount = afterCap.subtract(discount);
@@ -178,6 +181,10 @@ public final class BillingEngine {
             if (i < tiers.size() - 1 && tier.upperBound() == null) {
                 throw new DomainException("INVALID_PRICING_TIERS", "Only the last pricing tier may be open ended");
             }
+            if (i == tiers.size() - 1 && tier.upperBound() != null) {
+                throw new DomainException("INVALID_PRICING_TIERS",
+                        "The last pricing tier must be open ended so every usage level is covered");
+            }
             expectedLower = tier.upperBound();
         }
     }
@@ -200,7 +207,9 @@ public final class BillingEngine {
         long denominator = request.prorationMode() == ProrationMode.THIRTY_DAYS
                 ? 30
                 : ChronoUnit.DAYS.between(request.periodStart(), request.periodEnd());
-        return BigDecimal.valueOf(activeDays).divide(BigDecimal.valueOf(denominator), 18, RoundingMode.HALF_UP);
+        return BigDecimal.valueOf(activeDays)
+                .divide(BigDecimal.valueOf(denominator), 18, RoundingMode.HALF_UP)
+                .min(BigDecimal.ONE);
     }
 
     private BigDecimal roundUsage(BigDecimal rawUsage, RoundingRule rule) {

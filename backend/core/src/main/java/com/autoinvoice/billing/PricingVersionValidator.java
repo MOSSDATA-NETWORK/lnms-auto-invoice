@@ -88,6 +88,10 @@ public final class PricingVersionValidator {
             if (index < tiers.size() - 1 && tier.upperBound() == null) {
                 throw invalid("Only the last pricing tier may be open ended", Map.of("tier", index + 1));
             }
+            if (index == tiers.size() - 1 && tier.upperBound() != null) {
+                throw invalid("The last pricing tier must be open ended so every usage level is covered",
+                        Map.of("tier", index + 1));
+            }
             if (tier.upperBound() != null && tier.upperBound().compareTo(tier.lowerBound()) <= 0) {
                 throw invalid("Pricing tier upper bound must exceed its lower bound", Map.of("tier", index + 1));
             }

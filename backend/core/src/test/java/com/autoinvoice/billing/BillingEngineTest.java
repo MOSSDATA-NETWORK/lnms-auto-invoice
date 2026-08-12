@@ -200,6 +200,111 @@ class BillingEngineTest {
                 .hasMessageContaining("minor-unit range");
     }
 
+    @Test
+    void chargesNothingForUsageBasedTypesWhenPeriodHasNoOverlap() {
+        BillingRequest committed = inactivePeriodRequest(
+                BillingType.COMMITTED_PLUS_OVERAGE, new BigDecimal("180"), new BigDecimal("2000"),
+                null, new BigDecimal("100"), List.of());
+        assertThat(engine.calculate(committed).total()).isEqualByComparingTo("0.00");
+
+        BillingRequest traffic = inactivePeriodRequest(
+                BillingType.TOTAL_TRAFFIC, new BigDecimal("500"), new BigDecimal("300"),
+                new BigDecimal("2"), null, List.of());
+        assertThat(engine.calculate(traffic).total()).isEqualByComparingTo("0.00");
+
+        BillingRequest graduated = inactivePeriodRequest(
+                BillingType.GRADUATED, new BigDecimal("500"), null, null, null,
+                List.of(new PricingTier(BigDecimal.ZERO, new BigDecimal("100"), new BigDecimal("2")),
+                        new PricingTier(new BigDecimal("100"), null, BigDecimal.ONE)));
+        assertThat(engine.calculate(graduated).total()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void doesNotApplyMinimumChargeWhenPeriodHasNoOverlap() {
+        BillingRequest request = inactivePeriodRequest(
+                BillingType.FIXED_FEE, null, new BigDecimal("1000"), null, null, List.of());
+
+        assertThat(engine.calculate(request).total()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void capsThirtyDayProrationAtFullMonth() {
+        BillingRequest request = new BillingRequest(
+                BillingType.FIXED_FEE,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 8, 1),
+                null,
+                null,
+                ProrationMode.THIRTY_DAYS,
+                "CNY",
+                2,
+                null,
+                RoundingRule.none(),
+                null,
+                new BigDecimal("3000"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                false,
+                List.of()
+        );
+
+        assertThat(engine.calculate(request).total()).isEqualByComparingTo("3000.00");
+    }
+
+    @Test
+    void rejectsTiersWithBoundedLastTier() {
+        BillingRequest request = request(
+                BillingType.GRADUATED,
+                new BigDecimal("500"),
+                RoundingRule.none(),
+                null,
+                null,
+                null,
+                List.of(
+                        new PricingTier(BigDecimal.ZERO, new BigDecimal("100"), new BigDecimal("2")),
+                        new PricingTier(new BigDecimal("100"), new BigDecimal("200"), BigDecimal.ONE)
+                )
+        );
+
+        assertThatThrownBy(() -> engine.calculate(request))
+                .hasMessageContaining("last pricing tier must be open ended");
+    }
+
+    private BillingRequest inactivePeriodRequest(BillingType type, BigDecimal usage, BigDecimal baseFee,
+                                                 BigDecimal unitPrice, BigDecimal committed,
+                                                 List<PricingTier> tiers) {
+        return new BillingRequest(
+                type,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 6, 1),
+                ProrationMode.ACTUAL_DAYS,
+                "CNY",
+                2,
+                usage,
+                RoundingRule.none(),
+                BigDecimal.ONE,
+                baseFee,
+                unitPrice,
+                committed,
+                new BigDecimal("15"),
+                BigDecimal.ZERO,
+                new BigDecimal("500"),
+                null,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                false,
+                tiers
+        );
+    }
+
     private BillingRequest request(BillingType type, BigDecimal usage, RoundingRule rounding,
                                    BigDecimal baseFee, BigDecimal unitPrice, BigDecimal committed,
                                    List<PricingTier> tiers) {
