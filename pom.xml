@@ -34,7 +34,6 @@
     <handlebars.version>4.5.2</handlebars.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <jackson-2-bom.version>2.21.5</jackson-2-bom.version>
-    <jackson-bom.version>3.1.5</jackson-bom.version>
     <postgresql.version>42.7.12</postgresql.version>
     <poi.version>5.4.1</poi.version>
     <commons-csv.version>1.14.1</commons-csv.version>
@@ -46,6 +45,13 @@
         <groupId>org.springframework.modulith</groupId>
         <artifactId>spring-modulith-bom</artifactId>
         <version>${spring-modulith.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson-2-bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
