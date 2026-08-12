@@ -16,8 +16,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,7 +49,7 @@ class PersistentJobRunnerTest {
 
         try (PersistentJobRunner runner = new PersistentJobRunner(jobs,
                 List.of(new StubHandler("RENDER_INVOICE_PDF", Duration.ofMillis(80))),
-                "worker-1", "", Duration.ofMillis(250), Duration.ofMillis(10))) {
+                "worker-1", "", Duration.ofMillis(250), Duration.ofMillis(10), Duration.ofSeconds(30))) {
             assertThat(runner.drain(1)).isEqualTo(1);
         }
 
@@ -56,17 +58,36 @@ class PersistentJobRunnerTest {
     }
 
     @Test
+    void failsAJobWhenTheHandlerExceedsTheHardTimeout() {
+        BackgroundJobService jobs = mock(BackgroundJobService.class);
+        BackgroundJob job = new BackgroundJob(
+                UUID.randomUUID(), UUID.randomUUID(), "RENDER_INVOICE_PDF", "render-timeout",
+                JsonNodeFactory.instance.objectNode(), "LEASED", 1, 10, Instant.now(), Instant.now().plusSeconds(1));
+        when(jobs.claimNext(anyString(), any(Duration.class), any(String[].class)))
+                .thenReturn(Optional.of(job));
+
+        try (PersistentJobRunner runner = new PersistentJobRunner(jobs,
+                List.of(new StubHandler("RENDER_INVOICE_PDF", Duration.ofSeconds(30))),
+                "worker-1", "", Duration.ofMinutes(2), Duration.ofMillis(20), Duration.ofMillis(100))) {
+            assertThat(runner.drain(1)).isEqualTo(1);
+        }
+
+        verify(jobs).fail(eq(job.id()), eq("worker-1"), eq("HANDLER_TIMEOUT"), anyString(), any(Duration.class));
+        verify(jobs, never()).complete(any(), anyString(), any());
+    }
+
+    @Test
     void rejectsAHeartbeatThatCannotRenewBeforeExpiry() {
         BackgroundJobService jobs = mock(BackgroundJobService.class);
         assertThatThrownBy(() -> new PersistentJobRunner(jobs, List.of(), "worker-1", "",
-                Duration.ofSeconds(30), Duration.ofSeconds(30)))
+                Duration.ofSeconds(30), Duration.ofSeconds(30), Duration.ofMinutes(10)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("shorter than the lease");
     }
 
     private PersistentJobRunner runner(BackgroundJobService jobs, List<JobHandler> handlers, String enabled) {
         return new PersistentJobRunner(jobs, handlers, "worker-1", enabled,
-                Duration.ofMinutes(2), Duration.ofSeconds(30));
+                Duration.ofMinutes(2), Duration.ofSeconds(30), Duration.ofMinutes(10));
     }
 
     private record StubHandler(String type, Duration delay) implements JobHandler {

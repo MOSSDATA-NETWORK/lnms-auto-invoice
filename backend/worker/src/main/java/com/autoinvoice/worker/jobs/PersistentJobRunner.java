@@ -15,10 +15,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -29,28 +33,37 @@ public class PersistentJobRunner implements AutoCloseable {
     private final String workerId;
     private final Duration leaseDuration;
     private final Duration heartbeatInterval;
+    private final Duration handlerTimeout;
     private final ScheduledExecutorService heartbeatExecutor;
+    private final ExecutorService handlerExecutor;
 
     @Autowired
     public PersistentJobRunner(BackgroundJobService jobService, List<JobHandler> handlers,
                                @Value("${auto-invoice.worker.id:${spring.application.name}:local}") String workerId,
                                @Value("${auto-invoice.worker.job-types:}") String enabledJobTypes,
                                @Value("${auto-invoice.worker.lease-duration:2m}") Duration leaseDuration,
-                               @Value("${auto-invoice.worker.lease-heartbeat-interval:30s}") Duration heartbeatInterval) {
-        this(jobService, handlers, workerId, enabledJobTypes, leaseDuration, heartbeatInterval,
+                               @Value("${auto-invoice.worker.lease-heartbeat-interval:30s}") Duration heartbeatInterval,
+                               @Value("${auto-invoice.worker.handler-timeout:10m}") Duration handlerTimeout) {
+        this(jobService, handlers, workerId, enabledJobTypes, leaseDuration, heartbeatInterval, handlerTimeout,
                 Executors.newSingleThreadScheduledExecutor(
-                        Thread.ofPlatform().daemon(true).name("job-lease-heartbeat-", 0).factory()));
+                        Thread.ofPlatform().daemon(true).name("job-lease-heartbeat-", 0).factory()),
+                Executors.newCachedThreadPool(
+                        Thread.ofPlatform().daemon(true).name("job-handler-", 0).factory()));
     }
 
     private PersistentJobRunner(BackgroundJobService jobService, List<JobHandler> handlers, String workerId,
                                 String enabledJobTypes, Duration leaseDuration, Duration heartbeatInterval,
-                                ScheduledExecutorService heartbeatExecutor) {
+                                Duration handlerTimeout, ScheduledExecutorService heartbeatExecutor,
+                                ExecutorService handlerExecutor) {
         if (leaseDuration == null || leaseDuration.isZero() || leaseDuration.isNegative()) {
             throw new IllegalArgumentException("Worker lease duration must be positive");
         }
         if (heartbeatInterval == null || heartbeatInterval.isZero() || heartbeatInterval.isNegative()
                 || heartbeatInterval.compareTo(leaseDuration) >= 0) {
             throw new IllegalArgumentException("Worker heartbeat interval must be positive and shorter than the lease");
+        }
+        if (handlerTimeout == null || handlerTimeout.isZero() || handlerTimeout.isNegative()) {
+            throw new IllegalArgumentException("Worker handler timeout must be positive");
         }
         this.jobService = jobService;
         this.handlers = new LinkedHashMap<>();
@@ -73,7 +86,9 @@ public class PersistentJobRunner implements AutoCloseable {
         this.workerId = workerId;
         this.leaseDuration = leaseDuration;
         this.heartbeatInterval = heartbeatInterval;
+        this.handlerTimeout = handlerTimeout;
         this.heartbeatExecutor = heartbeatExecutor;
+        this.handlerExecutor = handlerExecutor;
     }
 
     public int drain(int maximumJobs) {
@@ -93,25 +108,46 @@ public class PersistentJobRunner implements AutoCloseable {
     private void run(BackgroundJob job) {
         JobHandler handler = handlers.get(job.type());
         LeaseHeartbeat heartbeat = startHeartbeat(job);
+        Future<JsonNode> execution = handlerExecutor.submit(() -> handler.handle(job));
         try {
-            JsonNode result = handler.handle(job);
+            JsonNode result = execution.get(handlerTimeout.toMillis(), TimeUnit.MILLISECONDS);
             heartbeat.close();
             heartbeat.assertHealthy();
             jobService.complete(job.id(), workerId, result);
-        } catch (Exception exception) {
+        } catch (TimeoutException timeout) {
+            execution.cancel(true);
+            heartbeat.close();
+            failWithBackoff(job, "HANDLER_TIMEOUT",
+                    "Handler exceeded the hard timeout of " + handlerTimeout);
+        } catch (InterruptedException interrupted) {
+            execution.cancel(true);
+            heartbeat.close();
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException exception) {
+            heartbeat.close();
+            Throwable cause = exception.getCause() == null ? exception : exception.getCause();
+            if (heartbeat.failed() || leaseLost(cause)) {
+                return;
+            }
+            failWithBackoff(job, cause.getClass().getSimpleName().toUpperCase(),
+                    cause.getMessage() == null ? "Worker handler failed" : cause.getMessage());
+        } catch (RuntimeException exception) {
             heartbeat.close();
             if (heartbeat.failed() || leaseLost(exception)) {
                 return;
             }
-            String code = exception.getClass().getSimpleName().toUpperCase();
-            String message = exception.getMessage() == null ? "Worker handler failed" : exception.getMessage();
-            long delaySeconds = Math.min(300, 5L << Math.min(job.attemptCount(), 6));
-            try {
-                jobService.fail(job.id(), workerId, code, truncate(message, 4000), Duration.ofSeconds(delaySeconds));
-            } catch (DomainException leaseException) {
-                if (!"JOB_LEASE_LOST".equals(leaseException.code())) {
-                    throw leaseException;
-                }
+            failWithBackoff(job, exception.getClass().getSimpleName().toUpperCase(),
+                    exception.getMessage() == null ? "Worker handler failed" : exception.getMessage());
+        }
+    }
+
+    private void failWithBackoff(BackgroundJob job, String code, String message) {
+        long delaySeconds = Math.min(300, 5L << Math.min(job.attemptCount(), 6));
+        try {
+            jobService.fail(job.id(), workerId, code, truncate(message, 4000), Duration.ofSeconds(delaySeconds));
+        } catch (DomainException leaseException) {
+            if (!"JOB_LEASE_LOST".equals(leaseException.code())) {
+                throw leaseException;
             }
         }
     }
@@ -132,7 +168,7 @@ public class PersistentJobRunner implements AutoCloseable {
         return new LeaseHeartbeat(future, failure);
     }
 
-    private boolean leaseLost(Exception exception) {
+    private boolean leaseLost(Throwable exception) {
         return exception instanceof DomainException domain && "JOB_LEASE_LOST".equals(domain.code());
     }
 
@@ -144,6 +180,7 @@ public class PersistentJobRunner implements AutoCloseable {
     @PreDestroy
     public void close() {
         heartbeatExecutor.shutdownNow();
+        handlerExecutor.shutdownNow();
     }
 
     private record LeaseHeartbeat(ScheduledFuture<?> future, AtomicReference<RuntimeException> failure)
