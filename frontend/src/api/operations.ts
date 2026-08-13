@@ -404,6 +404,9 @@ export interface CreateCompanyInput {
   bank_name?: string
   bank_account?: string
   invoice_type?: string
+  swift_code?: string
+  bank_code?: string
+  bank_address?: string
   default_currency: string
   default_tax_rate?: string
 }
@@ -951,6 +954,26 @@ export async function confirmMfaEnrollment(
   ).data as { recovery_codes: string[]; version: number }
 }
 
+export async function regenerateMfaRecoveryCodes(code: string) {
+  return (
+    await api.post(
+      '/auth/mfa/recovery-codes',
+      { code, reason: '用户重新生成 MFA 恢复码' },
+      { headers: { 'Idempotency-Key': idempotencyKey('mfa-recovery') } }
+    )
+  ).data as { recovery_codes: string[]; version: number }
+}
+
+export async function disableMfa(code: string) {
+  return (
+    await api.post(
+      '/auth/mfa/disable',
+      { code, reason: '用户禁用 MFA' },
+      { headers: { 'Idempotency-Key': idempotencyKey('mfa-disable') } }
+    )
+  ).data as { mfa_enabled: boolean; version: number }
+}
+
 export async function sendInvoice(
   invoice: InvoiceSummary,
   input: { emails: string[]; webhook_endpoint_ids: string[]; reason: string }
@@ -1254,6 +1277,9 @@ export function updateCompany(
     bank_name?: string
     bank_account?: string
     invoice_type?: string
+    swift_code?: string
+    bank_code?: string
+    bank_address?: string
     default_currency?: string
     default_tax_rate?: string
     status?: string

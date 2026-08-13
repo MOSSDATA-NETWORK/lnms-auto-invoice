@@ -40,5 +40,6 @@ function session(...permissions: PermissionCode[]): Session {
     display_name: 'User',
     permissions,
     must_change_password: false,
+    mfa_enabled: false,
   }
 }

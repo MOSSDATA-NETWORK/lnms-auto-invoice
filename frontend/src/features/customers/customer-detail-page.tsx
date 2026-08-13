@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { can } from '@/auth/permission'
-import { Route } from '@/routes/_authenticated/customers.$customerId'
+import { Route } from '@/routes/_authenticated/customers_.$customerId'
 import { ArrowLeft, Building2, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { sessionQuery } from '@/api/auth'
@@ -142,10 +142,9 @@ export function CustomerDetailPage() {
                     <TableHeader>
                       <TableRow className='bg-muted/30'>
                         <TableHead>公司</TableHead>
-                        <TableHead>开票种类</TableHead>
-                        <TableHead>税号</TableHead>
+                        <TableHead>地区</TableHead>
+                        <TableHead>开票/收款信息</TableHead>
                         <TableHead>电话</TableHead>
-                        <TableHead>开户银行 / 账户</TableHead>
                         <TableHead>状态</TableHead>
                         {writable && <TableHead />}
                       </TableRow>
@@ -163,22 +162,44 @@ export function CustomerDetailPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant='outline'>
-                              {company.invoice_type === 'SPECIAL'
-                                ? '专票'
-                                : '普票'}
+                              {company.country_region === 'HK'
+                                ? '香港'
+                                : '中国'}
                             </Badge>
                           </TableCell>
-                          <TableCell className='font-mono text-xs'>
-                            {company.tax_number ?? '—'}
+                          <TableCell className='text-xs'>
+                            {company.country_region === 'HK' ? (
+                              <div className='space-y-0.5 font-mono'>
+                                <p>{company.bank_name ?? '—'}</p>
+                                <p className='text-muted-foreground'>
+                                  {[company.bank_code, company.swift_code]
+                                    .filter(Boolean)
+                                    .join(' · ') || '—'}
+                                </p>
+                                <p className='text-muted-foreground'>
+                                  {company.bank_account ?? ''}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className='space-y-0.5'>
+                                <p>
+                                  {company.invoice_type === 'SPECIAL'
+                                    ? '专票'
+                                    : '普票'}
+                                  <span className='ml-2 font-mono text-muted-foreground'>
+                                    {company.tax_number ?? ''}
+                                  </span>
+                                </p>
+                                <p className='font-mono text-muted-foreground'>
+                                  {[company.bank_name, company.bank_account]
+                                    .filter(Boolean)
+                                    .join(' ') || '—'}
+                                </p>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className='font-mono text-xs'>
                             {company.phone ?? '—'}
-                          </TableCell>
-                          <TableCell className='text-xs'>
-                            <p>{company.bank_name ?? '—'}</p>
-                            <p className='mt-0.5 font-mono text-muted-foreground'>
-                              {company.bank_account ?? ''}
-                            </p>
                           </TableCell>
                           <TableCell>
                             <Badge

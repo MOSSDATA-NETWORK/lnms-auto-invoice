@@ -17,6 +17,7 @@ export interface CompanyFormValues {
   company_code: string
   company_name: string
   company_name_en?: string
+  country_region?: string
   address?: string
   tax_number?: string
   invoice_title?: string
@@ -24,9 +25,16 @@ export interface CompanyFormValues {
   bank_name?: string
   bank_account?: string
   invoice_type?: string
+  swift_code?: string
+  bank_code?: string
+  bank_address?: string
   default_currency: string
   default_tax_rate?: string
   status?: string
+}
+
+function companyRegion(company?: Company): string {
+  return company?.country_region === 'HK' ? 'HK' : 'CN'
 }
 
 export function CompanyFormDialog({
@@ -45,6 +53,7 @@ export function CompanyFormDialog({
   onSubmit: (values: CompanyFormValues) => void
 }) {
   const editing = Boolean(company)
+  const [region, setRegion] = useState(companyRegion(company))
   const [code, setCode] = useState(company?.company_code ?? '')
   const [name, setName] = useState(company?.company_name ?? '')
   const [nameEn, setNameEn] = useState(company?.company_name_en ?? '')
@@ -57,7 +66,12 @@ export function CompanyFormDialog({
   const [invoiceType, setInvoiceType] = useState(
     company?.invoice_type ?? 'GENERAL'
   )
-  const [currency, setCurrency] = useState(company?.default_currency ?? 'CNY')
+  const [swiftCode, setSwiftCode] = useState(company?.swift_code ?? '')
+  const [bankCode, setBankCode] = useState(company?.bank_code ?? '')
+  const [bankAddress, setBankAddress] = useState(company?.bank_address ?? '')
+  const [currency, setCurrency] = useState(
+    company?.default_currency ?? (region === 'HK' ? 'HKD' : 'CNY')
+  )
   const [taxRate, setTaxRate] = useState(company?.default_tax_rate ?? '')
   const [status, setStatus] = useState(company?.status ?? 'ACTIVE')
 
@@ -65,6 +79,11 @@ export function CompanyFormDialog({
     (editing || /^[A-Z0-9][A-Z0-9-]{2,63}$/.test(code.trim())) &&
     name.trim().length >= 2 &&
     /^[A-Z]{3}$/.test(currency.trim())
+
+  const switchRegion = (next: string) => {
+    setRegion(next)
+    setCurrency(next === 'HK' ? 'HKD' : 'CNY')
+  }
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -74,10 +93,23 @@ export function CompanyFormDialog({
             {editing ? `编辑公司 · ${company?.company_code}` : '新增公司'}
           </DialogTitle>
           <DialogDescription>
-            开票种类为专票时,请补齐税号、开户银行与银行账户。
+            {region === 'HK'
+              ? '香港公司不开具内地发票,请填写英文银行信息用于收款。'
+              : '开票种类为专票时,请补齐税号、开户银行与银行账户。'}
           </DialogDescription>
         </DialogHeader>
         <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='space-y-2'>
+            <Label>地区</Label>
+            <select
+              value={region}
+              onChange={(e) => switchRegion(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value='CN'>中国</option>
+              <option value='HK'>中国香港</option>
+            </select>
+          </div>
           {!editing && (
             <div className='space-y-2'>
               <Label>公司编码</Label>
@@ -98,36 +130,10 @@ export function CompanyFormDialog({
             <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
           </div>
           <div className='space-y-2 sm:col-span-2'>
-            <Label>地址</Label>
+            <Label>{region === 'HK' ? '公司地址' : '地址'}</Label>
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label>开票种类</Label>
-            <select
-              value={invoiceType}
-              onChange={(e) => setInvoiceType(e.target.value)}
-              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
-            >
-              <option value='GENERAL'>普票</option>
-              <option value='SPECIAL'>专票</option>
-            </select>
-          </div>
-          <div className='space-y-2'>
-            <Label>税号</Label>
-            <Input
-              className='font-mono'
-              value={taxNumber}
-              onChange={(e) => setTaxNumber(e.target.value)}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label>发票抬头</Label>
-            <Input
-              value={invoiceTitle}
-              onChange={(e) => setInvoiceTitle(e.target.value)}
             />
           </div>
           <div className='space-y-2'>
@@ -138,21 +144,92 @@ export function CompanyFormDialog({
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>
-          <div className='space-y-2'>
-            <Label>开户银行</Label>
-            <Input
-              value={bankName}
-              onChange={(e) => setBankName(e.target.value)}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label>银行账户</Label>
-            <Input
-              className='font-mono'
-              value={bankAccount}
-              onChange={(e) => setBankAccount(e.target.value)}
-            />
-          </div>
+          {region === 'CN' ? (
+            <>
+              <div className='space-y-2'>
+                <Label>开票种类</Label>
+                <select
+                  value={invoiceType}
+                  onChange={(e) => setInvoiceType(e.target.value)}
+                  className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+                >
+                  <option value='GENERAL'>普票</option>
+                  <option value='SPECIAL'>专票</option>
+                </select>
+              </div>
+              <div className='space-y-2'>
+                <Label>税号</Label>
+                <Input
+                  className='font-mono'
+                  value={taxNumber}
+                  onChange={(e) => setTaxNumber(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>发票抬头</Label>
+                <Input
+                  value={invoiceTitle}
+                  onChange={(e) => setInvoiceTitle(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>开户银行</Label>
+                <Input
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>银行账户</Label>
+                <Input
+                  className='font-mono'
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className='space-y-2'>
+                <Label>Bank Name</Label>
+                <Input
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>Bank Code</Label>
+                <Input
+                  className='font-mono'
+                  value={bankCode}
+                  onChange={(e) => setBankCode(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>Swift Code</Label>
+                <Input
+                  className='font-mono'
+                  value={swiftCode}
+                  onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>账户号码</Label>
+                <Input
+                  className='font-mono'
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2 sm:col-span-2'>
+                <Label>Bank Address</Label>
+                <Input
+                  value={bankAddress}
+                  onChange={(e) => setBankAddress(e.target.value)}
+                />
+              </div>
+            </>
+          )}
           <div className='space-y-2'>
             <Label>默认币种</Label>
             <Input
@@ -161,14 +238,16 @@ export function CompanyFormDialog({
               onChange={(e) => setCurrency(e.target.value.toUpperCase())}
             />
           </div>
-          <div className='space-y-2'>
-            <Label>默认税率(如 0.06)</Label>
-            <Input
-              className='font-mono'
-              value={taxRate}
-              onChange={(e) => setTaxRate(e.target.value)}
-            />
-          </div>
+          {region === 'CN' && (
+            <div className='space-y-2'>
+              <Label>默认税率(如 0.06)</Label>
+              <Input
+                className='font-mono'
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+              />
+            </div>
+          )}
           {editing && (
             <div className='space-y-2'>
               <Label>状态</Label>
@@ -195,15 +274,27 @@ export function CompanyFormDialog({
                 company_code: code.trim(),
                 company_name: name.trim(),
                 company_name_en: nameEn.trim() || undefined,
+                country_region: region,
                 address: address.trim() || undefined,
-                tax_number: taxNumber.trim() || undefined,
-                invoice_title: invoiceTitle.trim() || undefined,
+                tax_number:
+                  region === 'CN' ? taxNumber.trim() || undefined : undefined,
+                invoice_title:
+                  region === 'CN'
+                    ? invoiceTitle.trim() || undefined
+                    : undefined,
                 phone: phone.trim() || undefined,
                 bank_name: bankName.trim() || undefined,
                 bank_account: bankAccount.trim() || undefined,
-                invoice_type: invoiceType,
+                invoice_type: region === 'CN' ? invoiceType : undefined,
+                swift_code:
+                  region === 'HK' ? swiftCode.trim() || undefined : undefined,
+                bank_code:
+                  region === 'HK' ? bankCode.trim() || undefined : undefined,
+                bank_address:
+                  region === 'HK' ? bankAddress.trim() || undefined : undefined,
                 default_currency: currency.trim(),
-                default_tax_rate: taxRate.trim() || undefined,
+                default_tax_rate:
+                  region === 'CN' ? taxRate.trim() || undefined : undefined,
                 status: editing ? status : undefined,
               })
             }

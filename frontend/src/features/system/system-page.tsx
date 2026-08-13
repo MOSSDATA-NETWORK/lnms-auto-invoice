@@ -1,16 +1,24 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import {
   Download,
   KeyRound,
   Send,
   ShieldCheck,
+  ShieldOff,
   Siren,
   Upload,
   UsersRound,
   Webhook,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { sessionQuery } from '@/api/auth'
+import { problemFrom } from '@/api/http'
 import {
   beginMfaEnrollment,
   confirmImport,
@@ -19,9 +27,11 @@ import {
   createSystemRole,
   createSystemUser,
   createWebhookEndpoint,
+  disableMfa,
   importsQuery,
   notificationLogsQuery,
   operationalStatusQuery,
+  regenerateMfaRecoveryCodes,
   resetSystemUserPassword,
   systemRolesQuery,
   systemPermissionsQuery,
@@ -1158,6 +1168,8 @@ function QueueMetric({
 }
 
 function SecurityPanel() {
+  const queryClient = useQueryClient()
+  const { data: session } = useSuspenseQuery(sessionQuery)
   const [enrollment, setEnrollment] = useState<{
     secret: string
     otpauth_uri: string
@@ -1166,24 +1178,64 @@ function SecurityPanel() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [code, setCode] = useState('')
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>()
-  const [mfaEnabled, setMfaEnabled] = useState(false)
+  const [justEnabled, setJustEnabled] = useState(false)
+  const [action, setAction] = useState<'regenerate' | 'disable'>()
+  const [actionCode, setActionCode] = useState('')
+  const mfaEnabled = Boolean(session.mfa_enabled) || justEnabled
   const begin = useMutation({
     mutationFn: () => beginMfaEnrollment(currentPassword),
     onSuccess: (value) => {
       setEnrollment(value)
       setCurrentPassword('')
-      setMfaEnabled(false)
+      setJustEnabled(false)
       toast.success('MFA 注册密钥已生成')
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '开始注册失败')
     },
   })
   const confirm = useMutation({
     mutationFn: () => confirmMfaEnrollment(code, enrollment!.enrollment_proof),
-    onSuccess: (value) => {
+    onSuccess: async (value) => {
       setRecoveryCodes(value.recovery_codes)
       setEnrollment(undefined)
       setCode('')
-      setMfaEnabled(true)
+      setJustEnabled(true)
       toast.success('MFA 已启用，请离线保存恢复码')
+      await queryClient.invalidateQueries({ queryKey: ['session'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '确认失败')
+    },
+  })
+  const manage = useMutation({
+    mutationFn: async (): Promise<{
+      recovery_codes?: string[]
+      mfa_enabled?: boolean
+      version: number
+    }> =>
+      action === 'regenerate'
+        ? regenerateMfaRecoveryCodes(actionCode)
+        : disableMfa(actionCode),
+    onSuccess: async (value) => {
+      if (action === 'regenerate' && value.recovery_codes) {
+        setRecoveryCodes(value.recovery_codes)
+        setJustEnabled(true)
+        toast.success('新的恢复码已生成,旧恢复码全部失效')
+      } else {
+        setJustEnabled(false)
+        setRecoveryCodes(undefined)
+        toast.success('MFA 已禁用')
+      }
+      setAction(undefined)
+      setActionCode('')
+      await queryClient.invalidateQueries({ queryKey: ['session'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '操作失败')
     },
   })
   return (
@@ -1200,13 +1252,29 @@ function SecurityPanel() {
         </CardHeader>
         <CardContent className='space-y-4'>
           {mfaEnabled ? (
-            <div className='rounded-lg border border-emerald-600/30 bg-emerald-500/5 p-4 text-sm leading-6'>
-              <p className='font-medium text-emerald-800 dark:text-emerald-300'>
-                MFA 已启用
-              </p>
-              <p className='mt-1 text-muted-foreground'>
-                注册密钥和授权凭证已从页面内存清除。请立即离线保存右侧恢复码。
-              </p>
+            <div className='space-y-4'>
+              <div className='rounded-lg border border-emerald-600/30 bg-emerald-500/5 p-4 text-sm leading-6'>
+                <p className='font-medium text-emerald-800 dark:text-emerald-300'>
+                  MFA 已启用
+                </p>
+                <p className='mt-1 text-muted-foreground'>
+                  敏感操作会要求动态码。可在此重置恢复码或禁用 MFA。
+                </p>
+              </div>
+              <div className='flex flex-wrap gap-2'>
+                <Button
+                  variant='outline'
+                  onClick={() => setAction('regenerate')}
+                >
+                  <KeyRound /> 重新生成恢复码
+                </Button>
+                <Button
+                  variant='destructive'
+                  onClick={() => setAction('disable')}
+                >
+                  <ShieldOff /> 禁用 MFA
+                </Button>
+              </div>
             </div>
           ) : !enrollment ? (
             <div className='space-y-4'>
@@ -1285,6 +1353,43 @@ function SecurityPanel() {
           )}
         </CardContent>
       </Card>
+      <Dialog
+        open={Boolean(action)}
+        onOpenChange={(open) => !open && setAction(undefined)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {action === 'regenerate' ? '重新生成恢复码' : '禁用 MFA'}
+            </DialogTitle>
+            <DialogDescription>
+              {action === 'regenerate'
+                ? '生成后旧恢复码立即全部失效。'
+                : '禁用后敏感操作不再需要动态码。请输入当前认证器中的 6 位代码确认。'}
+            </DialogDescription>
+          </DialogHeader>
+          <Field label='6 位动态码'>
+            <Input
+              value={actionCode}
+              onChange={(event) => setActionCode(event.target.value)}
+              inputMode='numeric'
+              maxLength={6}
+            />
+          </Field>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setAction(undefined)}>
+              取消
+            </Button>
+            <Button
+              variant={action === 'disable' ? 'destructive' : 'default'}
+              disabled={!/^\d{6}$/.test(actionCode) || manage.isPending}
+              onClick={() => manage.mutate()}
+            >
+              确认
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

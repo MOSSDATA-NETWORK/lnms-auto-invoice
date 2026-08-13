@@ -45,6 +45,7 @@ function session(permissions = allPermissions): Session {
     display_name: '财务管理员',
     permissions,
     must_change_password: false,
+    mfa_enabled: false,
   }
 }
 
