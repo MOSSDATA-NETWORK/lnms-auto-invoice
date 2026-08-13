@@ -1,6 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarRange, Pencil, Play, ShieldCheck } from 'lucide-react'
+import {
+  CalendarRange,
+  FileSpreadsheet,
+  Pencil,
+  Play,
+  ShieldCheck,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { problemFrom } from '@/api/http'
 import {
@@ -8,6 +14,7 @@ import {
   generatePreview,
   profilesQuery,
   updateInvoiceProfile,
+  uploadProfileExcelTemplate,
   type InvoiceProfile,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +48,21 @@ export function ProfilesPage() {
   const profiles = useQuery(profilesQuery)
   const [selected, setSelected] = useState<InvoiceProfile>()
   const [editing, setEditing] = useState<InvoiceProfile>()
+  const excelInput = useRef<HTMLInputElement | null>(null)
+  const excelTarget = useRef<string | null>(null)
+  const uploadExcel = useMutation({
+    mutationFn: (file: File) =>
+      uploadProfileExcelTemplate(excelTarget.current ?? '', file),
+    onSuccess: async (file) => {
+      toast.success(`Excel 账单模板已上传：${file.filename}`)
+      excelTarget.current = null
+      await queryClient.invalidateQueries({ queryKey: ['invoice-profiles'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '上传模板失败')
+    },
+  })
   const updateMutation = useMutation({
     mutationFn: ({
       id,
@@ -149,6 +171,18 @@ export function ProfilesPage() {
                         </Button>
                         <Button
                           size='sm'
+                          variant='outline'
+                          disabled={uploadExcel.isPending}
+                          onClick={() => {
+                            excelTarget.current = profile.id
+                            excelInput.current?.click()
+                          }}
+                        >
+                          <FileSpreadsheet />
+                          Excel 模板
+                        </Button>
+                        <Button
+                          size='sm'
                           disabled={profile.status !== 'ACTIVE'}
                           onClick={() => setSelected(profile)}
                         >
@@ -167,6 +201,17 @@ export function ProfilesPage() {
       <GenerateDialog
         profile={selected}
         onClose={() => setSelected(undefined)}
+      />
+      <input
+        ref={excelInput}
+        type='file'
+        accept='.xlsx'
+        className='hidden'
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) uploadExcel.mutate(file)
+          event.target.value = ''
+        }}
       />
       <ProfileEditDialog
         key={editing?.id ?? 'closed'}

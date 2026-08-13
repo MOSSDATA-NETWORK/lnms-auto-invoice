@@ -18,7 +18,10 @@
         "s3:ListMultipartUploadParts",
         "s3:PutObject"
       ],
-      "Resource": ["arn:aws:s3:::__BUCKET__/*/uploads/*"]
+      "Resource": [
+        "arn:aws:s3:::__BUCKET__/*/uploads/*",
+        "arn:aws:s3:::__BUCKET__/*/documents/*"
+      ]
     }
   ]
 }

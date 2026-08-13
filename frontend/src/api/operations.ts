@@ -1447,3 +1447,53 @@ export function updateBillingEntity(
 ) {
   return patchEntity<BillingEntity>(`/billing-entities/${id}`, input, version)
 }
+
+export interface RenderedFile {
+  id: string
+  filename: string
+  mime_type: string
+  size: number
+  sha256: string
+}
+
+export async function uploadContractTemplate(
+  contractId: string,
+  file: File
+): Promise<RenderedFile> {
+  const form = new FormData()
+  form.append('file', file)
+  return (await api.post(`/contracts/${contractId}/template`, form))
+    .data as RenderedFile
+}
+
+export async function renderContractDocument(contractId: string) {
+  return (await api.post(`/contracts/${contractId}/render`, {}))
+    .data as RenderedFile
+}
+
+export async function uploadProfileExcelTemplate(
+  profileId: string,
+  file: File
+): Promise<RenderedFile> {
+  const form = new FormData()
+  form.append('file', file)
+  return (await api.post(`/invoice-profiles/${profileId}/excel-template`, form))
+    .data as RenderedFile
+}
+
+export async function renderInvoiceExcel(invoiceId: string) {
+  return (await api.post(`/invoices/${invoiceId}/render-excel`, {}))
+    .data as RenderedFile
+}
+
+export async function downloadFile(fileId: string, filename: string) {
+  const response = await api.get(`/files/${fileId}/content`, {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(response.data)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}

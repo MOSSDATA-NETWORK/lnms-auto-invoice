@@ -6,16 +6,20 @@ import {
   Eye,
   FileCheck2,
   FileClock,
+  FileSpreadsheet,
   RotateCcw,
   Send,
   WalletCards,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { problemFrom } from '@/api/http'
 import {
   createReplacementPreview,
+  downloadFile,
   invoiceDetailQuery,
   invoicesQuery,
   money,
+  renderInvoiceExcel,
   sendInvoice,
   voidInvoice,
   webhookEndpointsQuery,
@@ -108,6 +112,17 @@ export function InvoicesPage() {
         queryClient.invalidateQueries({ queryKey: ['invoices'] }),
         queryClient.invalidateQueries({ queryKey: ['invoice-previews'] }),
       ])
+    },
+  })
+  const excelMutation = useMutation({
+    mutationFn: (invoice: InvoiceSummary) => renderInvoiceExcel(invoice.id),
+    onSuccess: async (file) => {
+      toast.success(`Excel 账单已生成：${file.filename}`)
+      await downloadFile(file.id, file.filename)
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '生成 Excel 失败')
     },
   })
   const counts = useMemo(
@@ -422,6 +437,16 @@ export function InvoicesPage() {
                     <Download />
                     下载 PDF
                   </a>
+                </Button>
+              )}
+              {selected && (
+                <Button
+                  variant='outline'
+                  disabled={excelMutation.isPending}
+                  onClick={() => excelMutation.mutate(selected)}
+                >
+                  <FileSpreadsheet />
+                  下载 Excel
                 </Button>
               )}
             </div>

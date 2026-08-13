@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useRef, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight,
@@ -6,12 +6,14 @@ import {
   CalendarRange,
   CheckCircle2,
   CircleDollarSign,
+  FileText,
   GitBranch,
   Layers3,
   Pencil,
   Plus,
   Tags,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { customersQuery } from '@/api/customers'
@@ -32,6 +34,9 @@ import {
   updateContract,
   updateContractItem,
   validatePricingVersion,
+  renderContractDocument,
+  uploadContractTemplate,
+  downloadFile,
   type Contract,
   type ContractItem,
   type PricingVersion,
@@ -215,6 +220,30 @@ export function ContractsPage() {
     onError: (error) => {
       const problem = problemFrom(error)
       toast.error(problem.detail ?? problem.title ?? '更新计费项失败')
+    },
+  })
+  const templateInput = useRef<HTMLInputElement>(null)
+  const uploadTemplate = useMutation({
+    mutationFn: (file: File) =>
+      uploadContractTemplate(selectedContract!.id, file),
+    onSuccess: async (file) => {
+      toast.success(`合同模板已上传：${file.filename}`)
+      await queryClient.invalidateQueries({ queryKey: ['contracts'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '上传模板失败')
+    },
+  })
+  const renderContract = useMutation({
+    mutationFn: () => renderContractDocument(selectedContract!.id),
+    onSuccess: async (file) => {
+      toast.success('合同文档已生成')
+      await downloadFile(file.id, file.filename)
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '生成合同失败')
     },
   })
 
@@ -447,6 +476,22 @@ export function ContractsPage() {
                 activating={activateMutation.isPending}
                 onEditContract={(contract) => setEditingContract(contract)}
                 onEditItem={(item) => setEditingItem(item)}
+                onUploadTemplate={() => templateInput.current?.click()}
+                onRenderDocument={() => renderContract.mutate()}
+                templatePending={
+                  uploadTemplate.isPending || renderContract.isPending
+                }
+              />
+              <input
+                ref={templateInput}
+                type='file'
+                accept='.docx'
+                className='hidden'
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) uploadTemplate.mutate(file)
+                  event.target.value = ''
+                }}
               />
             </div>
           </TabsContent>
@@ -1336,6 +1381,9 @@ function ContractInspector({
   activating,
   onEditContract,
   onEditItem,
+  onUploadTemplate,
+  onRenderDocument,
+  templatePending,
 }: {
   contract?: Contract
   items: ContractItem[]
@@ -1345,6 +1393,9 @@ function ContractInspector({
   activating: boolean
   onEditContract: (contract: Contract) => void
   onEditItem: (item: ContractItem) => void
+  onUploadTemplate: () => void
+  onRenderDocument: () => void
+  templatePending: boolean
 }) {
   if (!contract) {
     return (
@@ -1365,7 +1416,7 @@ function ContractInspector({
               {contract.contract_no} · v{contract.version}
             </CardDescription>
           </div>
-          <div className='flex shrink-0 items-center gap-2'>
+          <div className='flex shrink-0 flex-wrap items-center justify-end gap-2'>
             <State value={contract.status} />
             <Button
               size='sm'
@@ -1373,6 +1424,21 @@ function ContractInspector({
               onClick={() => onEditContract(contract)}
             >
               <Pencil /> 编辑
+            </Button>
+            <Button
+              size='sm'
+              variant='outline'
+              disabled={templatePending}
+              onClick={onUploadTemplate}
+            >
+              <Upload /> Word 模板
+            </Button>
+            <Button
+              size='sm'
+              disabled={templatePending}
+              onClick={onRenderDocument}
+            >
+              <FileText /> 生成合同
             </Button>
           </div>
         </div>

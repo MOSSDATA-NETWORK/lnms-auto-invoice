@@ -83,6 +83,8 @@ public class SecurityConfiguration {
                                 "/api/v1/jobs/*/retry",
                                 "/api/v1/webhook-endpoints",
                                 "/api/v1/webhook-endpoints/**",
+                                "/api/v1/contracts/*/template",
+                                "/api/v1/invoice-profiles/*/excel-template",
                                 "/api/v1/librenms/instances",
                                 "/api/v1/billing-entities",
                                 "/api/v1/billing-entities/**",
