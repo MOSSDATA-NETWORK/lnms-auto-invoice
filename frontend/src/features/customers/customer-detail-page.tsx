@@ -8,16 +8,18 @@ import {
 import { Link } from '@tanstack/react-router'
 import { can } from '@/auth/permission'
 import { Route } from '@/routes/_authenticated/customers_.$customerId'
-import { ArrowLeft, Building2, Pencil, Plus } from 'lucide-react'
+import { ArrowLeft, Building2, FileText, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { sessionQuery } from '@/api/auth'
 import { customerDetailQuery } from '@/api/customers'
 import { problemFrom } from '@/api/http'
 import {
   companiesQuery,
+  contractsQuery,
   createCompany,
   updateCompany,
   type Company,
+  type Contract,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -83,6 +85,11 @@ export function CustomerDetailPage() {
 
   const list = (companies.data ?? []).filter(
     (company) => company.customer_id === customerId
+  )
+  const contracts = useQuery(contractsQuery)
+  const activeContracts = (contracts.data ?? []).filter(
+    (contract) =>
+      contract.customer_id === customerId && contract.status === 'ACTIVE'
   )
   const detail = customer.data
 
@@ -233,6 +240,71 @@ export function CustomerDetailPage() {
                 )}
               </CardContent>
             </Card>
+            <Card className='shadow-none'>
+              <CardHeader>
+                <CardTitle className='flex items-center gap-2 text-base'>
+                  <FileText className='size-4' />
+                  已生效合同({activeContracts.length})
+                </CardTitle>
+                <CardDescription>
+                  到期前 30 天提示续订;合同主体与计费项在合同管理中维护。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='p-0'>
+                {contracts.isLoading ? (
+                  <div className='p-6'>
+                    <Skeleton className='h-12 w-full' />
+                  </div>
+                ) : !activeContracts.length ? (
+                  <p className='p-12 text-center text-sm text-muted-foreground'>
+                    该客户暂无已生效合同。
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className='bg-muted/30'>
+                        <TableHead>合同</TableHead>
+                        <TableHead>签约公司</TableHead>
+                        <TableHead>开始时间</TableHead>
+                        <TableHead>到期时间</TableHead>
+                        <TableHead>续订</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeContracts.map((contract) => {
+                        const hint = renewalHint(contract)
+                        return (
+                          <TableRow key={contract.id}>
+                            <TableCell>
+                              <p className='font-medium'>
+                                {contract.contract_name}
+                              </p>
+                              <p className='mt-1 font-mono text-xs text-muted-foreground'>
+                                {contract.contract_no}
+                              </p>
+                            </TableCell>
+                            <TableCell className='text-xs'>
+                              {companies.data?.find(
+                                (c) => c.id === contract.company_id
+                              )?.company_name ?? '—'}
+                            </TableCell>
+                            <TableCell className='font-mono text-xs'>
+                              {contract.effective_from}
+                            </TableCell>
+                            <TableCell className='font-mono text-xs'>
+                              {contract.effective_to ?? '长期'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={hint.variant}>{hint.text}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </Main>
@@ -258,4 +330,27 @@ export function CustomerDetailPage() {
       )}
     </>
   )
+}
+
+function renewalHint(contract: Contract): {
+  text: string
+  variant: 'default' | 'secondary' | 'destructive' | 'outline'
+} {
+  if (contract.auto_renew) {
+    return { text: '自动续订', variant: 'default' }
+  }
+  if (!contract.effective_to) {
+    return { text: '长期有效', variant: 'secondary' }
+  }
+  const days = Math.ceil(
+    (new Date(`${contract.effective_to}T00:00:00`).getTime() - Date.now()) /
+      86_400_000
+  )
+  if (days < 0) {
+    return { text: '已到期', variant: 'destructive' }
+  }
+  if (days <= 30) {
+    return { text: `${days} 天后到期·待续订`, variant: 'outline' }
+  }
+  return { text: '履约中', variant: 'secondary' }
 }

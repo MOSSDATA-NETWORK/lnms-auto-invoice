@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileCode2, LockKeyhole, Plus, ShieldCheck } from 'lucide-react'
+import { Copy, FileCode2, LockKeyhole, Plus, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { problemFrom } from '@/api/http'
 import {
+  copyInvoiceTemplate,
   createInvoiceTemplate,
   createTemplateVersion,
   publishTemplateVersion,
@@ -51,7 +53,18 @@ export function TemplatesPage() {
   const [name, setName] = useState('')
   const [language, setLanguage] = useState('zh-CN')
   const [selected, setSelected] = useState<InvoiceTemplate>()
+  const [copying, setCopying] = useState<InvoiceTemplate>()
+  const [copyCode, setCopyCode] = useState('')
+  const [copyName, setCopyName] = useState('')
   const detail = useQuery(templateDetailQuery(selected?.id))
+  const latestVersion = detail.data?.versions?.[0]
+  useEffect(() => {
+    if (latestVersion) {
+      setHtml(latestVersion.html_content)
+      setCss(latestVersion.css_content ?? '')
+      setChangeNote(`基于 v${latestVersion.version_no} 修改`)
+    }
+  }, [latestVersion?.id])
   const [html, setHtml] = useState(
     '<main class="invoice"><h1>{{invoice_number}}</h1></main>'
   )
@@ -96,6 +109,24 @@ export function TemplatesPage() {
         }),
         queryClient.invalidateQueries({ queryKey: ['invoice-templates'] }),
       ])
+    },
+  })
+  const copy = useMutation({
+    mutationFn: () =>
+      copyInvoiceTemplate(copying!.id, {
+        template_code: copyCode.trim(),
+        template_name: copyName.trim(),
+      }),
+    onSuccess: async (created) => {
+      toast.success(`已复制为 ${created.template_name}`)
+      setCopying(undefined)
+      setCopyCode('')
+      setCopyName('')
+      await queryClient.invalidateQueries({ queryKey: ['invoice-templates'] })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '复制失败')
     },
   })
   return (
@@ -164,13 +195,26 @@ export function TemplatesPage() {
                         v{template.version}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size='sm'
-                          variant='outline'
-                          onClick={() => setSelected(template)}
-                        >
-                          管理版本
-                        </Button>
+                        <div className='flex gap-2'>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            onClick={() => setSelected(template)}
+                          >
+                            管理版本
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='ghost'
+                            onClick={() => {
+                              setCopying(template)
+                              setCopyCode(`${template.template_code}-COPY`)
+                              setCopyName(`${template.template_name} 副本`)
+                            }}
+                          >
+                            <Copy /> 复制
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -205,7 +249,53 @@ export function TemplatesPage() {
           </div>
         </div>
       </Main>
+      <Dialog
+        open={Boolean(copying)}
+        onOpenChange={(next) => !next && setCopying(undefined)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>复制模板 · {copying?.template_name}</DialogTitle>
+            <DialogDescription>
+              复制包含全部版本与资源;副本为独立草稿,可在线修改后再发布。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-4'>
+            <Field label='新模板代码'>
+              <Input
+                className='font-mono uppercase'
+                value={copyCode}
+                onChange={(event) =>
+                  setCopyCode(event.target.value.toUpperCase())
+                }
+              />
+            </Field>
+            <Field label='新模板名称'>
+              <Input
+                value={copyName}
+                onChange={(event) => setCopyName(event.target.value)}
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setCopying(undefined)}>
+              取消
+            </Button>
+            <Button
+              disabled={
+                copy.isPending ||
+                !/^[A-Z0-9][A-Z0-9_-]{2,99}$/.test(copyCode.trim()) ||
+                copyName.trim().length < 2
+              }
+              onClick={() => copy.mutate()}
+            >
+              创建副本
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={open} onOpenChange={setOpen}>
+        {' '}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>创建模板骨架</DialogTitle>

@@ -1157,6 +1157,19 @@ export async function createTemplateVersion(
   ).data as TemplateVersion
 }
 
+export async function copyInvoiceTemplate(
+  templateId: string,
+  input: { template_code: string; template_name: string }
+) {
+  return (
+    await api.post(
+      `/invoice-templates/${templateId}/copy`,
+      { ...input, reason: '从模板中心复制模板' },
+      { headers: { 'Idempotency-Key': idempotencyKey('template-copy') } }
+    )
+  ).data as InvoiceTemplate
+}
+
 export async function publishTemplateVersion(versionId: string) {
   return (
     await api.post(
