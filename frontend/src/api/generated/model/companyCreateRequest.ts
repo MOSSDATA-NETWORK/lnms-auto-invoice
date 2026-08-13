@@ -20,6 +20,11 @@ export interface CompanyCreateRequest {
   address?: string;
   tax_number?: string;
   invoice_title?: string;
+  phone?: string;
+  bank_name?: string;
+  bank_account?: string;
+  /** @pattern GENERAL|SPECIAL */
+  invoice_type?: string;
   /**
      * @minLength 1
      * @pattern [A-Z]{3}

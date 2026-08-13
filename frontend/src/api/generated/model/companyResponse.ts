@@ -16,6 +16,10 @@ export interface CompanyResponse {
   address?: string;
   tax_number?: string;
   invoice_title?: string;
+  phone?: string;
+  bank_name?: string;
+  bank_account?: string;
+  invoice_type?: string;
   default_currency?: string;
   /** @pattern ^-?\d+(?:\.\d+)?$ */
   default_tax_rate?: string;

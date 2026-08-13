@@ -101,18 +101,22 @@ public class MasterDataController {
                     jdbc.sql("""
                                     INSERT INTO companies(
                                         id, tenant_id, customer_id, company_code, company_name, company_name_en,
-                                        country_region, address, tax_number, invoice_title, default_currency,
-                                        default_tax_rate, status
+                                        country_region, address, tax_number, invoice_title, phone, bank_name,
+                                        bank_account, invoice_type, default_currency, default_tax_rate, status
                                     ) VALUES (
                                         :id, :tenantId, :customerId, :code, :name, :nameEn,
-                                        :country, :address, :taxNumber, :invoiceTitle, :currency, :taxRate, 'ACTIVE'
+                                        :country, :address, :taxNumber, :invoiceTitle, :phone, :bankName,
+                                        :bankAccount, COALESCE(:invoiceType, 'GENERAL'), :currency, :taxRate, 'ACTIVE'
                                     )
                                     """)
                             .param("id", id).param("tenantId", actor.tenantId()).param("customerId", request.customerId())
                             .param("code", request.companyCode()).param("name", request.companyName())
                             .param("nameEn", request.companyNameEn()).param("country", request.countryRegion())
                             .param("address", request.address()).param("taxNumber", request.taxNumber())
-                            .param("invoiceTitle", request.invoiceTitle()).param("currency", request.defaultCurrency())
+                            .param("invoiceTitle", request.invoiceTitle()).param("phone", request.phone())
+                            .param("bankName", request.bankName()).param("bankAccount", request.bankAccount())
+                            .param("invoiceType", request.invoiceType())
+                            .param("currency", request.defaultCurrency())
                             .param("taxRate", request.defaultTaxRate()).update();
                     CompanyResponse created = findCompany(actor.tenantId(), id);
                     record(actor, "company.created", "company", id, null, created, request.reason(), servletRequest);
@@ -138,6 +142,10 @@ public class MasterDataController {
                             address = COALESCE(:address, address),
                             tax_number = COALESCE(:taxNumber, tax_number),
                             invoice_title = COALESCE(:invoiceTitle, invoice_title),
+                            phone = COALESCE(:phone, phone),
+                            bank_name = COALESCE(:bankName, bank_name),
+                            bank_account = COALESCE(:bankAccount, bank_account),
+                            invoice_type = COALESCE(:invoiceType, invoice_type),
                             default_currency = COALESCE(:currency, default_currency),
                             default_tax_rate = COALESCE(:taxRate, default_tax_rate),
                             status = COALESCE(:status, status), updated_at = now(), version = version + 1
@@ -146,6 +154,8 @@ public class MasterDataController {
                 .param("name", request.companyName()).param("nameEn", request.companyNameEn())
                 .param("country", request.countryRegion()).param("address", request.address())
                 .param("taxNumber", request.taxNumber()).param("invoiceTitle", request.invoiceTitle())
+                .param("phone", request.phone()).param("bankName", request.bankName())
+                .param("bankAccount", request.bankAccount()).param("invoiceType", request.invoiceType())
                 .param("currency", request.defaultCurrency()).param("taxRate", request.defaultTaxRate())
                 .param("status", request.status()).param("tenantId", actor.tenantId()).param("id", id)
                 .param("version", version).update();
@@ -672,7 +682,9 @@ public class MasterDataController {
         return new CompanyResponse(rs.getObject("id", UUID.class), rs.getObject("customer_id", UUID.class),
                 rs.getString("company_code"), rs.getString("company_name"), rs.getString("company_name_en"),
                 rs.getString("country_region"), rs.getString("address"), rs.getString("tax_number"),
-                rs.getString("invoice_title"), rs.getString("default_currency"), rs.getBigDecimal("default_tax_rate"),
+                rs.getString("invoice_title"), rs.getString("phone"), rs.getString("bank_name"),
+                rs.getString("bank_account"), rs.getString("invoice_type"),
+                rs.getString("default_currency"), rs.getBigDecimal("default_tax_rate"),
                 rs.getString("status"), rs.getLong("version"));
     }
 
@@ -813,19 +825,24 @@ public class MasterDataController {
                                        @NotBlank @Pattern(regexp = "[A-Z0-9][A-Z0-9-]{2,63}") String companyCode,
                                        @NotBlank String companyName, String companyNameEn, String countryRegion,
                                        String address, String taxNumber, String invoiceTitle,
+                                       String phone, String bankName, String bankAccount,
+                                       @Pattern(regexp = "GENERAL|SPECIAL") String invoiceType,
                                        @NotBlank @Pattern(regexp = "[A-Z]{3}") String defaultCurrency,
                                        BigDecimal defaultTaxRate, @NotBlank String reason) {
     }
 
     public record CompanyUpdateRequest(String companyName, String companyNameEn, String countryRegion,
                                        String address, String taxNumber, String invoiceTitle,
+                                       String phone, String bankName, String bankAccount,
+                                       @Pattern(regexp = "GENERAL|SPECIAL") String invoiceType,
                                        @Pattern(regexp = "[A-Z]{3}") String defaultCurrency,
                                        BigDecimal defaultTaxRate, String status, @NotBlank String reason) {
     }
 
     public record CompanyResponse(UUID id, UUID customerId, String companyCode, String companyName,
                                   String companyNameEn, String countryRegion, String address, String taxNumber,
-                                  String invoiceTitle, String defaultCurrency, BigDecimal defaultTaxRate,
+                                  String invoiceTitle, String phone, String bankName, String bankAccount,
+                                  String invoiceType, String defaultCurrency, BigDecimal defaultTaxRate,
                                   String status, long version) {
     }
 
