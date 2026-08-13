@@ -22,6 +22,13 @@ export const customersQuery = (search = '') =>
       )) as CustomerPage,
   })
 
+export const customerDetailQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['customers', 'detail', id],
+    queryFn: async ({ signal }) =>
+      (await api.get<Customer>(`/customers/${id}`, { signal })).data,
+  })
+
 export async function createCustomer(
   input: CustomerCreateRequest
 ): Promise<Customer> {

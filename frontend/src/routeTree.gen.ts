@@ -26,6 +26,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedServicesRouteImport } from './routes/_authenticated/services'
 import { Route as AuthenticatedSystemRouteImport } from './routes/_authenticated/system'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
+import { Route as AuthenticatedCustomersCustomerIdRouteImport } from './routes/_authenticated/customers.$customerId'
 
 const R500Route = R500RouteImport.update({
   id: '/500',
@@ -111,6 +112,12 @@ const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCustomersCustomerIdRoute =
+  AuthenticatedCustomersCustomerIdRouteImport.update({
+    id: '/$customerId',
+    path: '/$customerId',
+    getParentRoute: () => AuthenticatedCustomersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/500': typeof R500Route
@@ -118,7 +125,7 @@ export interface FileRoutesByFullPath {
   '/forbidden': typeof ForbiddenRoute
   '/sign-in': typeof SignInRoute
   '/contracts': typeof AuthenticatedContractsRoute
-  '/customers': typeof AuthenticatedCustomersRoute
+  '/customers': typeof AuthenticatedCustomersRouteWithChildren
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/jobs': typeof AuthenticatedJobsRoute
   '/librenms': typeof AuthenticatedLibrenmsRoute
@@ -129,13 +136,14 @@ export interface FileRoutesByFullPath {
   '/services': typeof AuthenticatedServicesRoute
   '/system': typeof AuthenticatedSystemRoute
   '/templates': typeof AuthenticatedTemplatesRoute
+  '/customers/$customerId': typeof AuthenticatedCustomersCustomerIdRoute
 }
 export interface FileRoutesByTo {
   '/500': typeof R500Route
   '/forbidden': typeof ForbiddenRoute
   '/sign-in': typeof SignInRoute
   '/contracts': typeof AuthenticatedContractsRoute
-  '/customers': typeof AuthenticatedCustomersRoute
+  '/customers': typeof AuthenticatedCustomersRouteWithChildren
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/jobs': typeof AuthenticatedJobsRoute
   '/librenms': typeof AuthenticatedLibrenmsRoute
@@ -147,6 +155,7 @@ export interface FileRoutesByTo {
   '/system': typeof AuthenticatedSystemRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/': typeof AuthenticatedIndexRoute
+  '/customers/$customerId': typeof AuthenticatedCustomersCustomerIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -155,7 +164,7 @@ export interface FileRoutesById {
   '/forbidden': typeof ForbiddenRoute
   '/sign-in': typeof SignInRoute
   '/_authenticated/contracts': typeof AuthenticatedContractsRoute
-  '/_authenticated/customers': typeof AuthenticatedCustomersRoute
+  '/_authenticated/customers': typeof AuthenticatedCustomersRouteWithChildren
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
   '/_authenticated/jobs': typeof AuthenticatedJobsRoute
   '/_authenticated/librenms': typeof AuthenticatedLibrenmsRoute
@@ -167,6 +176,7 @@ export interface FileRoutesById {
   '/_authenticated/system': typeof AuthenticatedSystemRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/customers/$customerId': typeof AuthenticatedCustomersCustomerIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/system'
     | '/templates'
+    | '/customers/$customerId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/500'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/system'
     | '/templates'
     | '/'
+    | '/customers/$customerId'
   id:
     | '__root__'
     | '/500'
@@ -224,6 +236,7 @@ export interface FileRouteTypes {
     | '/_authenticated/system'
     | '/_authenticated/templates'
     | '/_authenticated/'
+    | '/_authenticated/customers/$customerId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -354,12 +367,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/customers/$customerId': {
+      id: '/_authenticated/customers/$customerId'
+      path: '/$customerId'
+      fullPath: '/customers/$customerId'
+      preLoaderRoute: typeof AuthenticatedCustomersCustomerIdRouteImport
+      parentRoute: typeof AuthenticatedCustomersRoute
+    }
   }
 }
 
+interface AuthenticatedCustomersRouteChildren {
+  AuthenticatedCustomersCustomerIdRoute: typeof AuthenticatedCustomersCustomerIdRoute
+}
+
+const AuthenticatedCustomersRouteChildren: AuthenticatedCustomersRouteChildren =
+  {
+    AuthenticatedCustomersCustomerIdRoute:
+      AuthenticatedCustomersCustomerIdRoute,
+  }
+
+const AuthenticatedCustomersRouteWithChildren =
+  AuthenticatedCustomersRoute._addFileChildren(
+    AuthenticatedCustomersRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedContractsRoute: typeof AuthenticatedContractsRoute
-  AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
+  AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRouteWithChildren
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
   AuthenticatedJobsRoute: typeof AuthenticatedJobsRoute
   AuthenticatedLibrenmsRoute: typeof AuthenticatedLibrenmsRoute
@@ -375,7 +410,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedContractsRoute: AuthenticatedContractsRoute,
-  AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
+  AuthenticatedCustomersRoute: AuthenticatedCustomersRouteWithChildren,
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
   AuthenticatedJobsRoute: AuthenticatedJobsRoute,
   AuthenticatedLibrenmsRoute: AuthenticatedLibrenmsRoute,

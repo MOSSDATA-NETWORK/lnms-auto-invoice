@@ -395,9 +395,17 @@ export interface CreateCompanyInput {
   customer_id: string
   company_code: string
   company_name: string
-  default_currency: string
+  company_name_en?: string
+  country_region?: string
+  address?: string
   tax_number?: string
   invoice_title?: string
+  phone?: string
+  bank_name?: string
+  bank_account?: string
+  invoice_type?: string
+  default_currency: string
+  default_tax_rate?: string
 }
 
 export async function createCompany(input: CreateCompanyInput) {
@@ -1242,6 +1250,10 @@ export function updateCompany(
     address?: string
     tax_number?: string
     invoice_title?: string
+    phone?: string
+    bank_name?: string
+    bank_account?: string
+    invoice_type?: string
     default_currency?: string
     default_tax_rate?: string
     status?: string
