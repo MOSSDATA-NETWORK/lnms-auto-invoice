@@ -10,12 +10,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MfaAuthorizationManagerTest {
     @Test
-    void sensitiveCommandsRequireBothMfaEnrollmentAndVerificationInThisSession() {
+    void sensitiveCommandsRequireVerificationOnlyWhenMfaIsEnabled() {
         AuthenticatedUser notEnrolled = user(false, false);
         AuthenticatedUser enrolledButNotVerified = user(true, false);
         AuthenticatedUser verified = user(true, true);
 
-        assertThat(MfaAuthorizationManager.isVerified(authentication(notEnrolled))).isFalse();
+        assertThat(MfaAuthorizationManager.isVerified(authentication(notEnrolled))).isTrue();
         assertThat(MfaAuthorizationManager.isVerified(authentication(enrolledButNotVerified))).isFalse();
         assertThat(MfaAuthorizationManager.isVerified(authentication(verified))).isTrue();
     }

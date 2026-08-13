@@ -58,18 +58,23 @@ export function TemplatesPage() {
   const [copyName, setCopyName] = useState('')
   const detail = useQuery(templateDetailQuery(selected?.id))
   const latestVersion = detail.data?.versions?.[0]
-  useEffect(() => {
-    if (latestVersion) {
-      setHtml(latestVersion.html_content)
-      setCss(latestVersion.css_content ?? '')
-      setChangeNote(`基于 v${latestVersion.version_no} 修改`)
-    }
-  }, [latestVersion?.id])
   const [html, setHtml] = useState(
     '<main class="invoice"><h1>{{invoice_number}}</h1></main>'
   )
   const [css, setCss] = useState('.invoice { font-family: sans-serif; }')
   const [changeNote, setChangeNote] = useState('初始化安全模板版本')
+  useEffect(() => {
+    // Prefill the draft editor from the newest version once it loads. This is
+    // a legitimate derived-state-on-change pattern the Compiler rule cannot
+    // rewrite because the version list arrives asynchronously.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (latestVersion) {
+      setHtml(latestVersion.html_content)
+      setCss(latestVersion.css_content ?? '')
+      setChangeNote(`基于 v${latestVersion.version_no} 修改`)
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [latestVersion?.id])
   const create = useMutation({
     mutationFn: () =>
       createInvoiceTemplate({

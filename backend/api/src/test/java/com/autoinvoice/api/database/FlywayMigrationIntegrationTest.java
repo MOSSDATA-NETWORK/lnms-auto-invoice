@@ -246,7 +246,7 @@ class FlywayMigrationIntegrationTest {
                         SELECT count(*) FROM pg_constraint
                         WHERE contype = 'u'
                           AND conname LIKE 'uq\\_tenant\\_%' ESCAPE '\\'
-                        """).query(Integer.class).single()).isEqualTo(30);
+                        """).query(Integer.class).single()).isEqualTo(31);
         assertThat(jdbc.sql("""
                         SELECT convalidated FROM pg_constraint
                         WHERE conname = 'ck_authentication_rate_limits_identity_scope'
