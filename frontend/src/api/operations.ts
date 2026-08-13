@@ -1,14 +1,14 @@
 import { queryOptions } from '@tanstack/react-query'
 import Decimal from 'decimal.js'
 import { detail as fetchInvoiceDetail } from './generated/formal-invoice-controller/formal-invoice-controller'
-import { list6 as fetchImports } from './generated/import-controller/import-controller'
+import { list7 as fetchImports } from './generated/import-controller/import-controller'
 import {
   invoices as fetchInvoices,
   preview1 as fetchPreview,
   previews as fetchPreviews,
 } from './generated/invoice-lifecycle-controller/invoice-lifecycle-controller'
 import { list3 as fetchProfiles } from './generated/invoice-profile-controller/invoice-profile-controller'
-import { list5 as fetchJobs } from './generated/job-controller/job-controller'
+import { list6 as fetchJobs } from './generated/job-controller/job-controller'
 import {
   discovered as fetchDiscoveredBills,
   list1 as fetchLibrenmsInstances,
@@ -1363,6 +1363,7 @@ export function updateInvoiceProfile(
   version: number,
   input: {
     profile_name?: string
+    billing_entity_id?: string
     template_id?: string
     language?: string
     timezone?: string
@@ -1400,4 +1401,49 @@ export function updateLibrenmsInstance(
     input,
     version
   )
+}
+
+export type BillingEntity = Complete<GeneratedModel.EntityResponse>
+
+export const billingEntitiesQuery = queryOptions({
+  queryKey: ['billing-entities'],
+  queryFn: async ({ signal }) =>
+    (await api.get('/billing-entities', { signal })).data as BillingEntity[],
+})
+
+export interface BillingEntityInput {
+  entity_code?: string
+  entity_name: string
+  entity_name_en?: string
+  country_region?: string
+  address?: string
+  phone?: string
+  tax_number?: string
+  br_number?: string
+  invoice_title?: string
+  bank_name?: string
+  bank_code?: string
+  swift_code?: string
+  bank_address?: string
+  bank_account?: string
+  default_currency?: string
+  status?: string
+}
+
+export async function createBillingEntity(input: BillingEntityInput) {
+  return (
+    await api.post(
+      '/billing-entities',
+      { ...input, reason: '在系统管理新增出账主体' },
+      { headers: { 'Idempotency-Key': idempotencyKey('billing-entity') } }
+    )
+  ).data as BillingEntity
+}
+
+export function updateBillingEntity(
+  id: string,
+  version: number,
+  input: BillingEntityInput & { reason: string }
+) {
+  return patchEntity<BillingEntity>(`/billing-entities/${id}`, input, version)
 }

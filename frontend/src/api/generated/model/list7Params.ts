@@ -6,8 +6,8 @@
  * OpenAPI spec version: v1
  */
 
-export type List6Params = {
+export type List7Params = {
 status?: string;
-type?: string;
+import_type?: string;
 limit?: number;
 };

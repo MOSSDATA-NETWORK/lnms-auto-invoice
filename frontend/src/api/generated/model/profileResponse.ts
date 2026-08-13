@@ -15,6 +15,7 @@ export interface ProfileResponse {
   company_id?: string;
   template_id?: string;
   approval_workflow_id?: string;
+  billing_entity_id?: string;
   language?: string;
   currency_code?: string;
   timezone?: string;

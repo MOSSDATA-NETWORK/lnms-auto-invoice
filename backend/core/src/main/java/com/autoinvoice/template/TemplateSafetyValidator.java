@@ -45,7 +45,7 @@ public class TemplateSafetyValidator {
             "legal", "legal portrait", "portrait legal", "legal landscape", "landscape legal"
     );
     private static final Set<String> ROOTS = Set.of(
-            "system", "customer", "company", "invoice", "service", "contract", "usage", "custom", "this"
+            "system", "customer", "company", "seller", "invoice", "service", "contract", "usage", "custom", "this"
     );
     private static final Set<String> DATA_VARIABLES = Set.of("@index", "@first", "@last", "@key");
     private static final Set<String> BLOCKS = Set.of("each", "if", "unless", "with");

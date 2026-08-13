@@ -10,6 +10,7 @@ import type { JsonNode } from './jsonNode';
 export interface ProfileUpdateRequest {
   profile_name?: string;
   template_id?: string;
+  billing_entity_id?: string;
   language?: string;
   timezone?: string;
   /**

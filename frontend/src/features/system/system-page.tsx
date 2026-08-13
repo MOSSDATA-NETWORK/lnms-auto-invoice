@@ -6,6 +6,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query'
 import {
+  Building,
   Download,
   KeyRound,
   Send,
@@ -80,6 +81,7 @@ import { Main } from '@/components/layout/main'
 import { PasswordInput } from '@/components/password-input'
 import { ConsoleHeader } from '@/features/shell/console-header'
 import { PageHeading } from '@/features/shell/page-heading'
+import { BillingEntitiesPanel } from '@/features/system/billing-entities-panel'
 
 export function SystemPage() {
   return (
@@ -113,6 +115,10 @@ export function SystemPage() {
               <KeyRound />
               MFA
             </TabsTrigger>
+            <TabsTrigger value='billing-entities'>
+              <Building />
+              出账主体
+            </TabsTrigger>
             <TabsTrigger value='operations'>
               <Siren />
               运维开关
@@ -132,6 +138,9 @@ export function SystemPage() {
           </TabsContent>
           <TabsContent value='security'>
             <SecurityPanel />
+          </TabsContent>
+          <TabsContent value='billing-entities'>
+            <BillingEntitiesPanel />
           </TabsContent>
           <TabsContent value='operations'>
             <OperationsPanel />

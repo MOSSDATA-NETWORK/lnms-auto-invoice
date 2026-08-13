@@ -419,6 +419,8 @@ public class InvoicePreviewGenerationService {
         company.put("bank_code", party.path("bank_code").asText(null));
         company.put("bank_address", party.path("bank_address").asText(null));
         company.put("br_number", party.path("br_number").asText(null));
+        JsonNode seller = readJson(profile.sellerSnapshot());
+        root.set("seller", seller);
         return root;
     }
 
@@ -506,11 +508,25 @@ public class InvoicePreviewGenerationService {
                                    'swift_code', company.swift_code, 'bank_code', company.bank_code, 'br_number', company.br_number,
                                    'bank_address', company.bank_address,
                                    'invoice_profile', company.invoice_profile_json
-                               ) AS party_snapshot
+                               ) AS party_snapshot,
+                               CASE WHEN entity.id IS NULL THEN '{}'::jsonb ELSE jsonb_build_object(
+                                   'id', entity.id, 'entity_code', entity.entity_code,
+                                   'entity_name', entity.entity_name, 'entity_name_en', entity.entity_name_en,
+                                   'country_region', entity.country_region,
+                                   'address', entity.address, 'phone', entity.phone,
+                                   'tax_number', entity.tax_number, 'br_number', entity.br_number,
+                                   'invoice_title', entity.invoice_title,
+                                   'bank_name', entity.bank_name, 'bank_code', entity.bank_code,
+                                   'swift_code', entity.swift_code, 'bank_address', entity.bank_address,
+                                   'bank_account', entity.bank_account,
+                                   'default_currency', entity.default_currency
+                               ) END AS seller_snapshot
                         FROM invoice_profiles profile
                         JOIN customers customer ON customer.tenant_id = profile.tenant_id AND customer.id = profile.customer_id
                         JOIN companies company ON company.tenant_id = profile.tenant_id AND company.id = profile.company_id
                         JOIN currencies currency ON currency.code = profile.currency_code AND currency.enabled
+                        LEFT JOIN billing_entities entity ON entity.tenant_id = profile.tenant_id
+                             AND entity.id = profile.billing_entity_id
                         LEFT JOIN invoice_templates template ON template.tenant_id = profile.tenant_id
                              AND template.id = profile.template_id
                         LEFT JOIN invoice_template_versions template_version ON template_version.tenant_id = profile.tenant_id
@@ -549,7 +565,7 @@ public class InvoicePreviewGenerationService {
                 rs.getObject("customer_id", UUID.class), rs.getObject("company_id", UUID.class), templateId,
                 templateVersionId, workflowVersionId, rs.getString("language"), rs.getString("currency_code"),
                 rs.getString("timezone"), rs.getInt("payment_terms_days"), rs.getBoolean("auto_submit_review"),
-                rs.getInt("minor_unit"), rs.getString("profile_snapshot"), rs.getString("party_snapshot"));
+                rs.getInt("minor_unit"), rs.getString("profile_snapshot"), rs.getString("party_snapshot"), rs.getString("seller_snapshot"));
     }
 
     private List<Assignment> loadAssignments(UUID tenantId, UUID profileId, OffsetDateTime periodStart,
@@ -841,7 +857,7 @@ public class InvoicePreviewGenerationService {
     private record Profile(UUID id, String code, UUID customerId, UUID companyId, UUID templateId,
                            UUID templateVersionId, UUID workflowVersionId, String language, String currency,
                            String timezone, int paymentTermsDays, boolean autoSubmitReview, int minorUnit,
-                           String profileSnapshot, String partySnapshot) {
+                           String profileSnapshot, String partySnapshot, String sellerSnapshot) {
     }
 
     private record Assignment(UUID id, UUID contractItemId, UUID serviceId, UUID pricingRuleId,

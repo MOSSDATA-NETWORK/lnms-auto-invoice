@@ -8,6 +8,4 @@
 
 export type List5Params = {
 status?: string;
-type?: string;
-limit?: number;
 };

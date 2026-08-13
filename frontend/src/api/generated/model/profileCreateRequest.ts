@@ -19,6 +19,7 @@ export interface ProfileCreateRequest {
   company_id: string;
   template_id: string;
   approval_workflow_id?: string;
+  billing_entity_id?: string;
   /** @minLength 1 */
   language: string;
   /**

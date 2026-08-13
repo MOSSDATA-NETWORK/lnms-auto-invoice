@@ -22,7 +22,6 @@ public class MfaAuthorizationManager implements AuthorizationManager<RequestAuth
                 && authentication.isAuthenticated()
                 && authentication.getPrincipal() instanceof AuthenticatedUser user
                 && user.enabled()
-                && user.mfaEnabled()
-                && user.mfaVerified();
+                && (!user.mfaEnabled() || user.mfaVerified());
     }
 }

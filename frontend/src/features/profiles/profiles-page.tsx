@@ -4,6 +4,7 @@ import { CalendarRange, Pencil, Play, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { problemFrom } from '@/api/http'
 import {
+  billingEntitiesQuery,
   generatePreview,
   profilesQuery,
   updateInvoiceProfile,
@@ -312,6 +313,7 @@ function ProfileEditDialog({
     version: number,
     input: {
       profile_name?: string
+      billing_entity_id?: string
       language?: string
       timezone?: string
       billing_day?: number
@@ -326,7 +328,9 @@ function ProfileEditDialog({
     }
   ) => void
 }) {
+  const entities = useQuery(billingEntitiesQuery)
   const [name, setName] = useState(profile?.profile_name ?? '')
+  const [entityId, setEntityId] = useState(profile?.billing_entity_id ?? '')
   const [timezone, setTimezone] = useState(profile?.timezone ?? 'Asia/Shanghai')
   const [billingDay, setBillingDay] = useState(
     String(profile?.billing_day ?? 1)
@@ -357,6 +361,23 @@ function ProfileEditDialog({
           <div className='space-y-2 sm:col-span-2'>
             <Label>配置名称</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>出账主体(切换开票/收款公司)</Label>
+            <select
+              value={entityId}
+              onChange={(e) => setEntityId(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value=''>未指定</option>
+              {(entities.data ?? [])
+                .filter((entity) => entity.status === 'ACTIVE')
+                .map((entity) => (
+                  <option key={entity.id} value={entity.id}>
+                    {entity.entity_name}({entity.entity_code})
+                  </option>
+                ))}
+            </select>
           </div>
           <div className='space-y-2'>
             <Label>时区</Label>
@@ -437,6 +458,7 @@ function ProfileEditDialog({
             onClick={() =>
               onSubmit(profile.id, profile.version, {
                 profile_name: name.trim(),
+                billing_entity_id: entityId || undefined,
                 timezone: timezone.trim(),
                 billing_day: Number(billingDay) || undefined,
                 payment_terms_days: Number(paymentTerms) || undefined,

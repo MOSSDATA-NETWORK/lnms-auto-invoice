@@ -84,6 +84,8 @@ public class SecurityConfiguration {
                                 "/api/v1/webhook-endpoints",
                                 "/api/v1/webhook-endpoints/**",
                                 "/api/v1/librenms/instances",
+                                "/api/v1/billing-entities",
+                                "/api/v1/billing-entities/**",
                                 "/api/v1/pricing-rules/**",
                                 "/api/v1/pricing-rule-versions/**",
                                 "/api/v1/pricing-rule-versions/*/publish",
@@ -92,7 +94,8 @@ public class SecurityConfiguration {
                                 "/api/v1/invoice-templates/*/rollback")
                         .access(mfaAuthorizationManager)
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/operations/settings",
-                                "/api/v1/librenms/instances/**")
+                                "/api/v1/librenms/instances/**",
+                                "/api/v1/billing-entities/**")
                         .access(mfaAuthorizationManager)
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
@@ -102,7 +105,8 @@ public class SecurityConfiguration {
                                     instanceof Authentication authentication
                                     && authentication.getPrincipal() instanceof AuthenticatedUser user
                                     && user.enabled()
-                                    && !(user.mfaEnabled() && user.mfaVerified());
+                                    && user.mfaEnabled()
+                                    && !user.mfaVerified();
                             response.setStatus(403);
                             response.setContentType("application/problem+json");
                             response.setCharacterEncoding("UTF-8");

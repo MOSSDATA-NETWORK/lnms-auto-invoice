@@ -110,13 +110,13 @@ public class InvoiceProfileController {
         jdbc.sql("""
                         INSERT INTO invoice_profiles(
                             id, tenant_id, profile_code, profile_name, customer_id, company_id,
-                            template_id, approval_workflow_id, language, currency_code, timezone,
+                            template_id, approval_workflow_id, billing_entity_id, language, currency_code, timezone,
                             billing_cycle, billing_day, payment_terms_days, tax_calculation_mode,
                             invoice_number_rule, payment_account_json, recipients_json,
                             auto_generate, auto_submit_review, auto_send, notes
                         ) VALUES (
                             :id, :tenantId, :code, :name, :customerId, :companyId,
-                            :templateId, :workflowId, :language, :currency, :timezone,
+                            :templateId, :workflowId, :billingEntityId, :language, :currency, :timezone,
                             :billingCycle, :billingDay, :paymentTerms, :taxMode,
                             :numberRule, CAST(:paymentAccount AS jsonb), CAST(:recipients AS jsonb),
                             :autoGenerate, :autoSubmit, :autoSend, :notes
@@ -125,7 +125,8 @@ public class InvoiceProfileController {
                 .param("id", id).param("tenantId", actor.tenantId()).param("code", request.profileCode())
                 .param("name", request.profileName()).param("customerId", request.customerId())
                 .param("companyId", request.companyId()).param("templateId", request.templateId())
-                .param("workflowId", workflowId).param("language", request.language())
+                .param("workflowId", workflowId).param("billingEntityId", request.billingEntityId())
+                .param("language", request.language())
                 .param("currency", request.currencyCode()).param("timezone", request.timezone())
                 .param("billingCycle", request.billingCycle()).param("billingDay", request.billingDay())
                 .param("paymentTerms", request.paymentTermsDays()).param("taxMode", request.taxCalculationMode())
@@ -161,6 +162,7 @@ public class InvoiceProfileController {
         long version = VersionEtag.parse(ifMatch);
         int changed = jdbc.sql("""
                         UPDATE invoice_profiles SET profile_name = COALESCE(:name, profile_name),
+                            billing_entity_id = COALESCE(:billingEntityId, billing_entity_id),
                             template_id = COALESCE(:templateId, template_id), language = COALESCE(:language, language),
                             timezone = COALESCE(:timezone, timezone), billing_day = COALESCE(:billingDay, billing_day),
                             payment_terms_days = COALESCE(:paymentTerms, payment_terms_days),
@@ -175,6 +177,7 @@ public class InvoiceProfileController {
                         """)
                 .param("name", request.profileName()).param("templateId", request.templateId())
                 .param("language", request.language()).param("timezone", request.timezone())
+                .param("billingEntityId", request.billingEntityId())
                 .param("billingDay", request.billingDay()).param("paymentTerms", request.paymentTermsDays())
                 .param("numberRule", request.invoiceNumberRule()).param("paymentAccount", nullableJson(request.paymentAccount()))
                 .param("recipients", nullableJson(request.recipients())).param("autoGenerate", request.autoGenerate())
@@ -469,7 +472,8 @@ public class InvoiceProfileController {
         return new ProfileResponse(rs.getObject("id", UUID.class), rs.getString("profile_code"),
                 rs.getString("profile_name"), rs.getObject("customer_id", UUID.class),
                 rs.getObject("company_id", UUID.class), rs.getObject("template_id", UUID.class),
-                rs.getObject("approval_workflow_id", UUID.class), rs.getString("language"),
+                rs.getObject("approval_workflow_id", UUID.class),
+                rs.getObject("billing_entity_id", UUID.class), rs.getString("language"),
                 rs.getString("currency_code"), rs.getString("timezone"), rs.getString("billing_cycle"),
                 rs.getObject("billing_day", Integer.class), rs.getInt("payment_terms_days"),
                 rs.getString("tax_calculation_mode"), rs.getString("invoice_number_rule"),
@@ -527,7 +531,7 @@ public class InvoiceProfileController {
     public record ProfileCreateRequest(
             @NotBlank @Pattern(regexp = "[A-Z0-9][A-Z0-9_-]{2,99}") String profileCode,
             @NotBlank String profileName, @NotNull UUID customerId, @NotNull UUID companyId,
-            @NotNull UUID templateId, UUID approvalWorkflowId, @NotBlank String language,
+            @NotNull UUID templateId, UUID approvalWorkflowId, UUID billingEntityId, @NotBlank String language,
             @NotBlank @Pattern(regexp = "[A-Z]{3}") String currencyCode, @NotBlank String timezone,
             @NotBlank String billingCycle, @Min(1) @Max(28) Integer billingDay,
             @PositiveOrZero int paymentTermsDays, @NotBlank String taxCalculationMode,
@@ -536,7 +540,7 @@ public class InvoiceProfileController {
             String notes, @NotBlank String reason) {
     }
 
-    public record ProfileUpdateRequest(String profileName, UUID templateId, String language, String timezone,
+    public record ProfileUpdateRequest(String profileName, UUID templateId, UUID billingEntityId, String language, String timezone,
                                        @Min(1) @Max(28) Integer billingDay,
                                        @PositiveOrZero Integer paymentTermsDays, String invoiceNumberRule,
                                        JsonNode paymentAccount, JsonNode recipients, Boolean autoGenerate,
@@ -554,7 +558,7 @@ public class InvoiceProfileController {
     }
 
     public record ProfileResponse(UUID id, String profileCode, String profileName, UUID customerId,
-                                  UUID companyId, UUID templateId, UUID approvalWorkflowId, String language,
+                                  UUID companyId, UUID templateId, UUID approvalWorkflowId, UUID billingEntityId, String language,
                                   String currencyCode, String timezone, String billingCycle, Integer billingDay,
                                   int paymentTermsDays, String taxCalculationMode, String invoiceNumberRule,
                                   JsonNode paymentAccount, JsonNode recipients, boolean autoGenerate,
