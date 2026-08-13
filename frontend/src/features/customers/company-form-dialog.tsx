@@ -26,6 +26,7 @@ export interface CompanyFormValues {
   bank_account?: string
   invoice_type?: string
   swift_code?: string
+  br_number?: string
   bank_code?: string
   bank_address?: string
   default_currency: string
@@ -69,6 +70,7 @@ export function CompanyFormDialog({
   const [swiftCode, setSwiftCode] = useState(company?.swift_code ?? '')
   const [bankCode, setBankCode] = useState(company?.bank_code ?? '')
   const [bankAddress, setBankAddress] = useState(company?.bank_address ?? '')
+  const [brNumber, setBrNumber] = useState(company?.br_number ?? '')
   const [currency, setCurrency] = useState(
     company?.default_currency ?? (region === 'HK' ? 'HKD' : 'CNY')
   )
@@ -191,6 +193,15 @@ export function CompanyFormDialog({
           ) : (
             <>
               <div className='space-y-2'>
+                <Label>商业登记号(BR Number)</Label>
+                <Input
+                  className='font-mono'
+                  placeholder='8 位数字'
+                  value={brNumber}
+                  onChange={(e) => setBrNumber(e.target.value)}
+                />
+              </div>
+              <div className='space-y-2'>
                 <Label>Bank Name</Label>
                 <Input
                   value={bankName}
@@ -288,6 +299,8 @@ export function CompanyFormDialog({
                 invoice_type: region === 'CN' ? invoiceType : undefined,
                 swift_code:
                   region === 'HK' ? swiftCode.trim() || undefined : undefined,
+                br_number:
+                  region === 'HK' ? brNumber.trim() || undefined : undefined,
                 bank_code:
                   region === 'HK' ? bankCode.trim() || undefined : undefined,
                 bank_address:

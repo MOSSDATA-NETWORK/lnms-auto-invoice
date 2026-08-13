@@ -23,6 +23,7 @@ export interface CompanyResponse {
   swift_code?: string;
   bank_code?: string;
   bank_address?: string;
+  br_number?: string;
   default_currency?: string;
   /** @pattern ^-?\d+(?:\.\d+)?$ */
   default_tax_rate?: string;

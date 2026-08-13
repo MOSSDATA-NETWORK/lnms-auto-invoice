@@ -21,6 +21,7 @@ export interface CompanyUpdateRequest {
   swift_code?: string;
   bank_code?: string;
   bank_address?: string;
+  br_number?: string;
   /** @pattern [A-Z]{3} */
   default_currency?: string;
   /** @pattern ^-?\d+(?:\.\d+)?$ */

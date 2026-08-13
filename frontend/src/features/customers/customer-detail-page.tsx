@@ -170,6 +170,9 @@ export function CustomerDetailPage() {
                           <TableCell className='text-xs'>
                             {company.country_region === 'HK' ? (
                               <div className='space-y-0.5 font-mono'>
+                                {company.br_number && (
+                                  <p>BR: {company.br_number}</p>
+                                )}
                                 <p>{company.bank_name ?? '—'}</p>
                                 <p className='text-muted-foreground'>
                                   {[company.bank_code, company.swift_code]

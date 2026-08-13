@@ -28,6 +28,7 @@ export interface CompanyCreateRequest {
   swift_code?: string;
   bank_code?: string;
   bank_address?: string;
+  br_number?: string;
   /**
      * @minLength 1
      * @pattern [A-Z]{3}

@@ -405,6 +405,7 @@ export interface CreateCompanyInput {
   bank_account?: string
   invoice_type?: string
   swift_code?: string
+  br_number?: string
   bank_code?: string
   bank_address?: string
   default_currency: string
@@ -1278,6 +1279,7 @@ export function updateCompany(
     bank_account?: string
     invoice_type?: string
     swift_code?: string
+    br_number?: string
     bank_code?: string
     bank_address?: string
     default_currency?: string

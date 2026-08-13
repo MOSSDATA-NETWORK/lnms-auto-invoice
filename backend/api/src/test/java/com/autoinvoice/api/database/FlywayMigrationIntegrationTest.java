@@ -38,7 +38,7 @@ class FlywayMigrationIntegrationTest {
                         WHERE success AND version IS NOT NULL
                         ORDER BY installed_rank DESC LIMIT 1
                         """)
-                .query(String.class).single()).isEqualTo("32");
+                .query(String.class).single()).isEqualTo("33");
         assertThat(jdbc.sql("SELECT to_regclass('tenant_operational_settings') IS NOT NULL")
                 .query(Boolean.class).single()).isTrue();
         assertThat(jdbc.sql("""
