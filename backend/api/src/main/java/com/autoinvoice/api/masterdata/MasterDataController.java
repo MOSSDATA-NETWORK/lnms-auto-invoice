@@ -102,11 +102,13 @@ public class MasterDataController {
                                     INSERT INTO companies(
                                         id, tenant_id, customer_id, company_code, company_name, company_name_en,
                                         country_region, address, tax_number, invoice_title, phone, bank_name,
-                                        bank_account, invoice_type, default_currency, default_tax_rate, status
+                                        bank_account, invoice_type, swift_code, bank_code, bank_address,
+                                        default_currency, default_tax_rate, status
                                     ) VALUES (
                                         :id, :tenantId, :customerId, :code, :name, :nameEn,
                                         :country, :address, :taxNumber, :invoiceTitle, :phone, :bankName,
-                                        :bankAccount, COALESCE(:invoiceType, 'GENERAL'), :currency, :taxRate, 'ACTIVE'
+                                        :bankAccount, COALESCE(:invoiceType, 'GENERAL'), :swiftCode, :bankCode,
+                                        :bankAddress, :currency, :taxRate, 'ACTIVE'
                                     )
                                     """)
                             .param("id", id).param("tenantId", actor.tenantId()).param("customerId", request.customerId())
@@ -115,7 +117,8 @@ public class MasterDataController {
                             .param("address", request.address()).param("taxNumber", request.taxNumber())
                             .param("invoiceTitle", request.invoiceTitle()).param("phone", request.phone())
                             .param("bankName", request.bankName()).param("bankAccount", request.bankAccount())
-                            .param("invoiceType", request.invoiceType())
+                            .param("invoiceType", request.invoiceType()).param("swiftCode", request.swiftCode())
+                            .param("bankCode", request.bankCode()).param("bankAddress", request.bankAddress())
                             .param("currency", request.defaultCurrency())
                             .param("taxRate", request.defaultTaxRate()).update();
                     CompanyResponse created = findCompany(actor.tenantId(), id);
@@ -146,6 +149,9 @@ public class MasterDataController {
                             bank_name = COALESCE(:bankName, bank_name),
                             bank_account = COALESCE(:bankAccount, bank_account),
                             invoice_type = COALESCE(:invoiceType, invoice_type),
+                            swift_code = COALESCE(:swiftCode, swift_code),
+                            bank_code = COALESCE(:bankCode, bank_code),
+                            bank_address = COALESCE(:bankAddress, bank_address),
                             default_currency = COALESCE(:currency, default_currency),
                             default_tax_rate = COALESCE(:taxRate, default_tax_rate),
                             status = COALESCE(:status, status), updated_at = now(), version = version + 1
@@ -156,6 +162,8 @@ public class MasterDataController {
                 .param("taxNumber", request.taxNumber()).param("invoiceTitle", request.invoiceTitle())
                 .param("phone", request.phone()).param("bankName", request.bankName())
                 .param("bankAccount", request.bankAccount()).param("invoiceType", request.invoiceType())
+                .param("swiftCode", request.swiftCode()).param("bankCode", request.bankCode())
+                .param("bankAddress", request.bankAddress())
                 .param("currency", request.defaultCurrency()).param("taxRate", request.defaultTaxRate())
                 .param("status", request.status()).param("tenantId", actor.tenantId()).param("id", id)
                 .param("version", version).update();
@@ -683,7 +691,8 @@ public class MasterDataController {
                 rs.getString("company_code"), rs.getString("company_name"), rs.getString("company_name_en"),
                 rs.getString("country_region"), rs.getString("address"), rs.getString("tax_number"),
                 rs.getString("invoice_title"), rs.getString("phone"), rs.getString("bank_name"),
-                rs.getString("bank_account"), rs.getString("invoice_type"),
+                rs.getString("bank_account"), rs.getString("invoice_type"), rs.getString("swift_code"),
+                rs.getString("bank_code"), rs.getString("bank_address"),
                 rs.getString("default_currency"), rs.getBigDecimal("default_tax_rate"),
                 rs.getString("status"), rs.getLong("version"));
     }
@@ -827,6 +836,7 @@ public class MasterDataController {
                                        String address, String taxNumber, String invoiceTitle,
                                        String phone, String bankName, String bankAccount,
                                        @Pattern(regexp = "GENERAL|SPECIAL") String invoiceType,
+                                       String swiftCode, String bankCode, String bankAddress,
                                        @NotBlank @Pattern(regexp = "[A-Z]{3}") String defaultCurrency,
                                        BigDecimal defaultTaxRate, @NotBlank String reason) {
     }
@@ -835,6 +845,7 @@ public class MasterDataController {
                                        String address, String taxNumber, String invoiceTitle,
                                        String phone, String bankName, String bankAccount,
                                        @Pattern(regexp = "GENERAL|SPECIAL") String invoiceType,
+                                       String swiftCode, String bankCode, String bankAddress,
                                        @Pattern(regexp = "[A-Z]{3}") String defaultCurrency,
                                        BigDecimal defaultTaxRate, String status, @NotBlank String reason) {
     }
@@ -842,7 +853,8 @@ public class MasterDataController {
     public record CompanyResponse(UUID id, UUID customerId, String companyCode, String companyName,
                                   String companyNameEn, String countryRegion, String address, String taxNumber,
                                   String invoiceTitle, String phone, String bankName, String bankAccount,
-                                  String invoiceType, String defaultCurrency, BigDecimal defaultTaxRate,
+                                  String invoiceType, String swiftCode, String bankCode, String bankAddress,
+                                  String defaultCurrency, BigDecimal defaultTaxRate,
                                   String status, long version) {
     }
 

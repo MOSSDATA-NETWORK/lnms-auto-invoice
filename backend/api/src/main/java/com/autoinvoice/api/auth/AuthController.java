@@ -153,10 +153,11 @@ public class AuthController {
     }
 
     public record SessionResponse(UUID userId, UUID tenantId, String tenantCode, String username,
-                                  String displayName, Set<String> permissions, boolean mustChangePassword) {
+                                  String displayName, Set<String> permissions, boolean mustChangePassword,
+                                  boolean mfaEnabled) {
         static SessionResponse from(AuthenticatedUser user) {
             return new SessionResponse(user.userId(), user.tenantId(), user.tenantCode(), user.username(),
-                    user.displayName(), user.permissions(), user.mustChangePassword());
+                    user.displayName(), user.permissions(), user.mustChangePassword(), user.mfaEnabled());
         }
     }
 }

@@ -14,4 +14,5 @@ export interface SessionResponse {
   display_name?: string;
   permissions?: string[];
   must_change_password?: boolean;
+  mfa_enabled?: boolean;
 }

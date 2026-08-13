@@ -20,6 +20,9 @@ export interface CompanyResponse {
   bank_name?: string;
   bank_account?: string;
   invoice_type?: string;
+  swift_code?: string;
+  bank_code?: string;
+  bank_address?: string;
   default_currency?: string;
   /** @pattern ^-?\d+(?:\.\d+)?$ */
   default_tax_rate?: string;

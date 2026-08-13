@@ -415,6 +415,9 @@ public class InvoicePreviewGenerationService {
         company.put("bank_name", party.path("bank_name").asText(null));
         company.put("bank_account", party.path("bank_account").asText(null));
         company.put("invoice_type", party.path("invoice_type").asText(null));
+        company.put("swift_code", party.path("swift_code").asText(null));
+        company.put("bank_code", party.path("bank_code").asText(null));
+        company.put("bank_address", party.path("bank_address").asText(null));
         return root;
     }
 
@@ -499,6 +502,8 @@ public class InvoicePreviewGenerationService {
                                    'invoice_title', company.invoice_title,
                                    'phone', company.phone, 'bank_name', company.bank_name,
                                    'bank_account', company.bank_account, 'invoice_type', company.invoice_type,
+                                   'swift_code', company.swift_code, 'bank_code', company.bank_code,
+                                   'bank_address', company.bank_address,
                                    'invoice_profile', company.invoice_profile_json
                                ) AS party_snapshot
                         FROM invoice_profiles profile

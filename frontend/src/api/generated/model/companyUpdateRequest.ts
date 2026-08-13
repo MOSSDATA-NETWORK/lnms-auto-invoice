@@ -18,6 +18,9 @@ export interface CompanyUpdateRequest {
   bank_account?: string;
   /** @pattern GENERAL|SPECIAL */
   invoice_type?: string;
+  swift_code?: string;
+  bank_code?: string;
+  bank_address?: string;
   /** @pattern [A-Z]{3} */
   default_currency?: string;
   /** @pattern ^-?\d+(?:\.\d+)?$ */

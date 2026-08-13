@@ -25,6 +25,9 @@ export interface CompanyCreateRequest {
   bank_account?: string;
   /** @pattern GENERAL|SPECIAL */
   invoice_type?: string;
+  swift_code?: string;
+  bank_code?: string;
+  bank_address?: string;
   /**
      * @minLength 1
      * @pattern [A-Z]{3}
