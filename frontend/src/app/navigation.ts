@@ -24,14 +24,13 @@ type GuardedItem = {
   permissions?: PermissionCode[]
 }
 
-const items: GuardedItem[] = [
-  { title: '总览', url: '/', icon: LayoutDashboard },
-  {
-    title: '客户管理',
-    url: '/customers',
-    icon: Building2,
-    permissions: ['customer.read'],
-  },
+const overview: GuardedItem = {
+  title: '总览',
+  url: '/',
+  icon: LayoutDashboard,
+}
+
+const business: GuardedItem[] = [
   {
     title: '业务管理',
     url: '/services',
@@ -39,16 +38,10 @@ const items: GuardedItem[] = [
     permissions: ['customer.read'],
   },
   {
-    title: '合同与价格',
+    title: '合同管理',
     url: '/contracts',
     icon: BookOpenCheck,
     permissions: ['contract.write', 'pricing.publish'],
-  },
-  {
-    title: 'LibreNMS',
-    url: '/librenms',
-    icon: Cable,
-    permissions: ['usage.sync'],
   },
   {
     title: '账单配置',
@@ -79,6 +72,9 @@ const items: GuardedItem[] = [
     icon: FileStack,
     permissions: ['template.publish'],
   },
+]
+
+const finance: GuardedItem[] = [
   {
     title: '付款管理',
     url: '/payments',
@@ -86,10 +82,25 @@ const items: GuardedItem[] = [
     permissions: ['payment.record'],
   },
   {
+    title: '公司抬头',
+    url: '/customers',
+    icon: Building2,
+    permissions: ['customer.read'],
+  },
+  {
     title: '报表中心',
     url: '/reports',
     icon: ScrollText,
     permissions: ['payment.record', 'audit.read', 'system.admin'],
+  },
+]
+
+const admin: GuardedItem[] = [
+  {
+    title: 'LibreNMS',
+    url: '/librenms',
+    icon: Cable,
+    permissions: ['usage.sync'],
   },
   {
     title: '任务与审计',
@@ -105,17 +116,21 @@ const items: GuardedItem[] = [
   },
 ]
 
+function visible(items: GuardedItem[], session?: Session) {
+  return items
+    .filter(
+      (item) =>
+        !item.permissions ||
+        item.permissions.some((permission) => can(session, permission))
+    )
+    .map(({ permissions: _permissions, ...item }) => item)
+}
+
 export function navigationFor(session?: Session): NavGroup[] {
   return [
-    {
-      title: '账务运行',
-      items: items
-        .filter(
-          (item) =>
-            !item.permissions ||
-            item.permissions.some((permission) => can(session, permission))
-        )
-        .map(({ permissions: _permissions, ...item }) => item),
-    },
+    { title: '总览', items: visible([overview], session) },
+    { title: '业务端', items: visible(business, session) },
+    { title: '财务端', items: visible(finance, session) },
+    { title: '管理端', items: visible(admin, session) },
   ]
 }
