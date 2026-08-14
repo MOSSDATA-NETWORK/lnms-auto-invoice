@@ -32,6 +32,12 @@ const overview: GuardedItem = {
 
 const business: GuardedItem[] = [
   {
+    title: '客户管理',
+    url: '/customers',
+    icon: Building2,
+    permissions: ['customer.read'],
+  },
+  {
     title: '业务管理',
     url: '/services',
     icon: Boxes,
@@ -80,12 +86,6 @@ const finance: GuardedItem[] = [
     url: '/payments',
     icon: WalletCards,
     permissions: ['payment.record'],
-  },
-  {
-    title: '公司抬头',
-    url: '/customers',
-    icon: Building2,
-    permissions: ['customer.read'],
   },
   {
     title: '报表中心',
