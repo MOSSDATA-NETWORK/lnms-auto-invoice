@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, FileCode2, LockKeyhole, Plus, ShieldCheck } from 'lucide-react'
+import {
+  Copy,
+  FileCode2,
+  FileUp,
+  LockKeyhole,
+  Plus,
+  ShieldCheck,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { problemFrom } from '@/api/http'
 import {
   copyInvoiceTemplate,
   createInvoiceTemplate,
   createTemplateVersion,
+  documentTemplatesQuery,
   publishTemplateVersion,
   templateDetailQuery,
   templatesQuery,
+  updateDocumentTemplate,
+  uploadDocumentTemplate,
+  type DocumentTemplate,
   type InvoiceTemplate,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +52,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Main } from '@/components/layout/main'
 import { ConsoleHeader } from '@/features/shell/console-header'
 import { PageHeading } from '@/features/shell/page-heading'
@@ -149,7 +161,20 @@ export function TemplatesPage() {
             </Button>
           }
         />
-        <div className='grid gap-4 lg:grid-cols-[1fr_320px]'>
+        <Tabs defaultValue='contract'>
+          <TabsList className='h-auto flex-wrap'>
+            <TabsTrigger value='contract'>合同模板(Word)</TabsTrigger>
+            <TabsTrigger value='invoice'>账单模板(Excel)</TabsTrigger>
+            <TabsTrigger value='pdf'>PDF模板(HTML)</TabsTrigger>
+          </TabsList>
+          <TabsContent value='contract'>
+            <DocTemplatesTab type='CONTRACT_DOCX' accept='.docx' />
+          </TabsContent>
+          <TabsContent value='invoice'>
+            <DocTemplatesTab type='INVOICE_XLSX' accept='.xlsx' />
+          </TabsContent>
+          <TabsContent value='pdf'>
+            <div className='grid gap-4 lg:grid-cols-[1fr_320px]'>
           <div className='overflow-hidden rounded-xl border bg-card'>
             {templates.isLoading ? (
               <Loading />
@@ -253,6 +278,8 @@ export function TemplatesPage() {
             </Card>
           </div>
         </div>
+          </TabsContent>
+        </Tabs>
       </Main>
       <Dialog
         open={Boolean(copying)}
@@ -465,6 +492,235 @@ function Loading() {
       {Array.from({ length: 5 }).map((_, index) => (
         <Skeleton key={index} className='h-12' />
       ))}
+    </div>
+  )
+}
+
+function DocTemplatesTab({
+  type,
+  accept,
+}: {
+  type: 'CONTRACT_DOCX' | 'INVOICE_XLSX'
+  accept: string
+}) {
+  const queryClient = useQueryClient()
+  const templates = useQuery(documentTemplatesQuery(type))
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState<File>()
+  const [toggling, setToggling] = useState<string>()
+
+  const submit = async () => {
+    if (!file) return
+    setUploading(true)
+    try {
+      await uploadDocumentTemplate(
+        {
+          template_code: code.trim().toUpperCase(),
+          template_name: name.trim(),
+          template_type: type,
+          description: description.trim() || undefined,
+        },
+        file
+      )
+      toast.success('文档模板已上传')
+      setFile(undefined)
+      setCode('')
+      setName('')
+      setDescription('')
+      await queryClient.invalidateQueries({
+        queryKey: ['document-templates', type],
+      })
+    } catch (error) {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '上传失败')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const toggle = async (template: DocumentTemplate) => {
+    setToggling(template.id)
+    try {
+      const next = template.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+      await updateDocumentTemplate(template.id!, template.version ?? 0, {
+        status: next,
+      })
+      toast.success(next === 'ACTIVE' ? '模板已启用' : '模板已停用')
+      await queryClient.invalidateQueries({
+        queryKey: ['document-templates', type],
+      })
+    } catch (error) {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '操作失败')
+    } finally {
+      setToggling(undefined)
+    }
+  }
+
+  return (
+    <div className='grid gap-4 lg:grid-cols-[1fr_320px]'>
+      <div className='overflow-hidden rounded-xl border bg-card'>
+        <div className='flex items-center justify-between gap-3 border-b px-4 py-3'>
+          <p className='text-sm font-medium'>
+            {type === 'CONTRACT_DOCX' ? '合同模板(Word)' : '账单模板(Excel)'}
+          </p>
+          <Button size='sm' onClick={() => fileRef.current?.click()}>
+            <FileUp />
+            上传模板
+          </Button>
+          <input
+            ref={fileRef}
+            type='file'
+            accept={accept}
+            className='hidden'
+            onChange={(event) => {
+              const picked = event.target.files?.[0]
+              if (picked) {
+                setFile(picked)
+                setName(picked.name.replace(/\.[^.]+$/, ''))
+              }
+              event.target.value = ''
+            }}
+          />
+        </div>
+        {templates.isLoading ? (
+          <Loading />
+        ) : !templates.data?.length ? (
+          <div className='grid place-items-center py-16 text-center'>
+            <FileCode2 className='size-7 text-muted-foreground' />
+            <p className='mt-4 font-semibold'>尚无模板</p>
+            <p className='mt-2 text-sm text-muted-foreground'>
+              上传 {accept} 文件即可开始使用，字段用 {'{{变量名}}'} 占位。
+            </p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className='bg-muted/30'>
+                <TableHead>模板代码</TableHead>
+                <TableHead>名称</TableHead>
+                <TableHead>说明</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {templates.data.map((template) => (
+                <TableRow key={template.id}>
+                  <TableCell className='font-mono text-xs font-semibold'>
+                    {template.template_code}
+                  </TableCell>
+                  <TableCell className='font-medium'>
+                    {template.template_name}
+                  </TableCell>
+                  <TableCell className='text-xs text-muted-foreground'>
+                    {template.description ?? '-'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        template.status === 'ACTIVE' ? 'default' : 'outline'
+                      }
+                    >
+                      {template.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size='sm'
+                      variant='ghost'
+                      disabled={toggling === template.id}
+                      onClick={() => toggle(template)}
+                    >
+                      {template.status === 'ACTIVE' ? '停用' : '启用'}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+      <Card className='shadow-none'>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2 text-base'>
+            <ShieldCheck className='size-4 text-emerald-700' />
+            版本与文件
+          </CardTitle>
+          <CardDescription>
+            上传会记录文件版本与操作人；合同出件与账单生成时读取此处 ACTIVE
+            模板。合同甲方取自公司抬头，乙方取自客户公司；账单模板用于正式账单生成。
+            正式文件留存 SHA-256 与对象存储引用。
+          </CardDescription>
+        </CardHeader>
+      </Card>
+      <Dialog
+        open={Boolean(file)}
+        onOpenChange={(next) => !next && setFile(undefined)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              上传{type === 'CONTRACT_DOCX' ? '合同' : '账单'}模板
+            </DialogTitle>
+            <DialogDescription>
+              文件为 {accept} 格式，字段用 {'{{变量名}}'}
+              占位，出件时替换为公司抬头与客户参数。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-4'>
+            <Field label='模板代码'>
+              <Input
+                className='font-mono uppercase'
+                value={code}
+                onChange={(event) => setCode(event.target.value.toUpperCase())}
+                placeholder='CONTRACT_STD'
+              />
+            </Field>
+            <Field label='模板名称'>
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </Field>
+            <Field label='文件'>
+              <Button
+                variant='outline'
+                onClick={() => fileRef.current?.click()}
+              >
+                {file ? file.name : '选择文件'}
+              </Button>
+            </Field>
+            <Field label='说明'>
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                className='min-h-20 text-xs'
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setFile(undefined)}>
+              取消
+            </Button>
+            <Button
+              disabled={
+                uploading ||
+                !file ||
+                !/^[A-Z0-9][A-Z0-9_-]{2,99}$/.test(code.trim()) ||
+                name.trim().length < 2
+              }
+              onClick={submit}
+            >
+              {uploading ? '上传中…' : '上传'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

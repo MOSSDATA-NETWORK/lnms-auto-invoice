@@ -6,6 +6,6 @@
  * OpenAPI spec version: v1
  */
 
-export type List6Params = {
-status?: string;
+export type Update3Body = {
+  file?: Blob;
 };

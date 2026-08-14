@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1
  */
 
-export type List6Params = {
+export type Update3Params = {
+template_name?: string;
+description?: string;
 status?: string;
+reason?: string;
 };

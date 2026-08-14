@@ -1,20 +1,15 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  CalendarRange,
-  FileSpreadsheet,
-  Pencil,
-  Play,
-  ShieldCheck,
-} from 'lucide-react'
+import { CalendarRange, Pencil, Play, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { problemFrom } from '@/api/http'
 import {
   billingEntitiesQuery,
+  companiesQuery,
+  documentTemplatesQuery,
   generatePreview,
   profilesQuery,
   updateInvoiceProfile,
-  uploadProfileExcelTemplate,
   type InvoiceProfile,
 } from '@/api/operations'
 import { Badge } from '@/components/ui/badge'
@@ -46,23 +41,19 @@ import { PageHeading } from '@/features/shell/page-heading'
 export function ProfilesPage() {
   const queryClient = useQueryClient()
   const profiles = useQuery(profilesQuery)
+  const entities = useQuery(billingEntitiesQuery)
+  const companies = useQuery(companiesQuery)
+  const excelTemplates = useQuery(documentTemplatesQuery('INVOICE_XLSX'))
+  const entityName = (id?: string) =>
+    entities.data?.find((entity) => entity.id === id)?.entity_name
+  const companyName = (id?: string) =>
+    companies.data?.find((company) => company.id === id)?.company_name ??
+    companies.data?.find((company) => company.id === id)?.invoice_title
+  const excelTemplateName = (id?: string) =>
+    excelTemplates.data?.find((template) => template.id === id)
+      ?.template_name
   const [selected, setSelected] = useState<InvoiceProfile>()
   const [editing, setEditing] = useState<InvoiceProfile>()
-  const excelInput = useRef<HTMLInputElement | null>(null)
-  const excelTarget = useRef<string | null>(null)
-  const uploadExcel = useMutation({
-    mutationFn: (file: File) =>
-      uploadProfileExcelTemplate(excelTarget.current ?? '', file),
-    onSuccess: async (file) => {
-      toast.success(`Excel 账单模板已上传：${file.filename}`)
-      excelTarget.current = null
-      await queryClient.invalidateQueries({ queryKey: ['invoice-profiles'] })
-    },
-    onError: (error) => {
-      const problem = problemFrom(error)
-      toast.error(problem.detail ?? problem.title ?? '上传模板失败')
-    },
-  })
   const updateMutation = useMutation({
     mutationFn: ({
       id,
@@ -113,6 +104,9 @@ export function ProfilesPage() {
               <TableHeader>
                 <TableRow className='bg-muted/30'>
                   <TableHead>配置</TableHead>
+                  <TableHead>客户公司</TableHead>
+                  <TableHead>出账主体</TableHead>
+                  <TableHead>账单模板</TableHead>
                   <TableHead>结算策略</TableHead>
                   <TableHead>自动化</TableHead>
                   <TableHead>状态</TableHead>
@@ -126,6 +120,31 @@ export function ProfilesPage() {
                       <p className='font-medium'>{profile.profile_name}</p>
                       <p className='mt-1 font-mono text-xs text-muted-foreground'>
                         {profile.profile_code}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <p className='text-sm'>
+                        {companyName(profile.company_id) ?? '未指定'}
+                      </p>
+                      <p className='mt-1 font-mono text-[11px] text-muted-foreground'>
+                        {profile.company_id?.slice(0, 8) ?? '-'}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <p className='text-sm'>
+                        {entityName(profile.billing_entity_id) ?? '未指定'}
+                      </p>
+                      <p className='mt-1 font-mono text-[11px] text-muted-foreground'>
+                        {profile.billing_entity_id?.slice(0, 8) ?? '-'}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <p className='text-sm'>
+                        {excelTemplateName(profile.document_template_id) ??
+                          '未选择'}
+                      </p>
+                      <p className='mt-1 font-mono text-[11px] text-muted-foreground'>
+                        {profile.document_template_id?.slice(0, 8) ?? '-'}
                       </p>
                     </TableCell>
                     <TableCell>
@@ -171,18 +190,6 @@ export function ProfilesPage() {
                         </Button>
                         <Button
                           size='sm'
-                          variant='outline'
-                          disabled={uploadExcel.isPending}
-                          onClick={() => {
-                            excelTarget.current = profile.id
-                            excelInput.current?.click()
-                          }}
-                        >
-                          <FileSpreadsheet />
-                          Excel 模板
-                        </Button>
-                        <Button
-                          size='sm'
                           disabled={profile.status !== 'ACTIVE'}
                           onClick={() => setSelected(profile)}
                         >
@@ -201,17 +208,6 @@ export function ProfilesPage() {
       <GenerateDialog
         profile={selected}
         onClose={() => setSelected(undefined)}
-      />
-      <input
-        ref={excelInput}
-        type='file'
-        accept='.xlsx'
-        className='hidden'
-        onChange={(event) => {
-          const file = event.target.files?.[0]
-          if (file) uploadExcel.mutate(file)
-          event.target.value = ''
-        }}
       />
       <ProfileEditDialog
         key={editing?.id ?? 'closed'}
@@ -359,6 +355,7 @@ function ProfileEditDialog({
     input: {
       profile_name?: string
       billing_entity_id?: string
+      document_template_id?: string
       language?: string
       timezone?: string
       billing_day?: number
@@ -374,8 +371,12 @@ function ProfileEditDialog({
   ) => void
 }) {
   const entities = useQuery(billingEntitiesQuery)
+  const documentTemplates = useQuery(documentTemplatesQuery('INVOICE_XLSX'))
   const [name, setName] = useState(profile?.profile_name ?? '')
   const [entityId, setEntityId] = useState(profile?.billing_entity_id ?? '')
+  const [docTemplateId, setDocTemplateId] = useState(
+    profile?.document_template_id ?? ''
+  )
   const [timezone, setTimezone] = useState(profile?.timezone ?? 'Asia/Shanghai')
   const [billingDay, setBillingDay] = useState(
     String(profile?.billing_day ?? 1)
@@ -420,6 +421,23 @@ function ProfileEditDialog({
                 .map((entity) => (
                   <option key={entity.id} value={entity.id}>
                     {entity.entity_name}({entity.entity_code})
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className='space-y-2 sm:col-span-2'>
+            <Label>账单模板(模板中心 Excel)</Label>
+            <select
+              value={docTemplateId}
+              onChange={(e) => setDocTemplateId(e.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value=''>未选择</option>
+              {(documentTemplates.data ?? [])
+                .filter((template) => template.status === 'ACTIVE')
+                .map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.template_name}({template.template_code})
                   </option>
                 ))}
             </select>
@@ -504,6 +522,7 @@ function ProfileEditDialog({
               onSubmit(profile.id, profile.version, {
                 profile_name: name.trim(),
                 billing_entity_id: entityId || undefined,
+                document_template_id: docTemplateId || undefined,
                 timezone: timezone.trim(),
                 billing_day: Number(billingDay) || undefined,
                 payment_terms_days: Number(paymentTerms) || undefined,

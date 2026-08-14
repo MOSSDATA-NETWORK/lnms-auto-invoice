@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -77,11 +78,17 @@ public class DocumentController {
     @PostMapping("/contracts/{id}/render")
     @PreAuthorize("hasAnyAuthority('contract.write','system.admin')")
     public ResponseEntity<RenderedFile> renderContract(
-            Authentication authentication, @PathVariable UUID id, HttpServletRequest servletRequest) throws Exception {
+            Authentication authentication, @PathVariable UUID id,
+            @RequestBody(required = false) ContractRenderRequest request,
+            HttpServletRequest servletRequest) throws Exception {
         AuthenticatedUser actor = principal(authentication);
         ContractTemplate contract = findContractTemplate(actor.tenantId(), id);
-        byte[] template = load(actor.tenantId(), contract.templateFileId());
-        JsonNode model = contractModel(actor.tenantId(), contract);
+        UUID templateFileId = request != null && request.templateId() != null
+                ? requireDocumentTemplateFile(actor.tenantId(), request.templateId(), "CONTRACT_DOCX")
+                : contract.templateFileId();
+        byte[] template = load(actor.tenantId(), templateFileId);
+        JsonNode model = contractModel(actor.tenantId(), contract,
+                request != null ? request.billingEntityId() : null);
         byte[] filled = contractRenderer.render(template, new PlaceholderResolver(toRoots(model)));
         RenderedFile file = store(actor, filled, contract.contractNo() + "-合同.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
@@ -117,7 +124,14 @@ public class DocumentController {
             Authentication authentication, @PathVariable UUID id, HttpServletRequest servletRequest) throws Exception {
         AuthenticatedUser actor = principal(authentication);
         InvoiceTemplate invoice = findInvoiceRenderSource(actor.tenantId(), id);
-        byte[] template = load(actor.tenantId(), invoice.excelTemplateFileId());
+        UUID templateFileId = invoice.documentTemplateId() != null
+                ? requireDocumentTemplateFile(actor.tenantId(), invoice.documentTemplateId(), "INVOICE_XLSX")
+                : invoice.excelTemplateFileId();
+        if (templateFileId == null) {
+            throw new DomainException("TEMPLATE_REQUIRED",
+                    "Invoice has no Excel template; select one in 账单配置 from the template center", 422, Map.of("invoice_id", id));
+        }
+        byte[] template = load(actor.tenantId(), templateFileId);
         ObjectNode root = (ObjectNode) objectMapper.readTree(invoice.renderModelJson());
         ObjectNode invoiceNode = root.has("invoice") && root.get("invoice").isObject()
                 ? (ObjectNode) root.get("invoice") : root.putObject("invoice");
@@ -139,7 +153,7 @@ public class DocumentController {
         return roots;
     }
 
-    private JsonNode contractModel(UUID tenantId, ContractTemplate contract) {
+    private JsonNode contractModel(UUID tenantId, ContractTemplate contract, UUID billingEntityId) {
         ObjectNode model = objectMapper.createObjectNode();
         model.set("customer", jdbc.sql("""
                         SELECT customer_no, customer_name, customer_type FROM customers
@@ -163,11 +177,25 @@ public class DocumentController {
         contractNode.put("auto_renew", String.valueOf(contract.autoRenew()));
         contractNode.put("status", contract.status());
         model.set("contract", contractNode);
-        model.set("seller", sellerModel(tenantId));
+        model.set("seller", sellerModel(tenantId, billingEntityId));
         return model;
     }
 
-    private JsonNode sellerModel(UUID tenantId) {
+    private JsonNode sellerModel(UUID tenantId, UUID entityId) {
+        if (entityId != null) {
+            return jdbc.sql("""
+                            SELECT entity_code, entity_name, entity_name_en, country_region, address, phone,
+                                   tax_number, br_number, invoice_title, bank_name, bank_code, swift_code,
+                                   bank_address, bank_account, default_currency
+                            FROM billing_entities
+                            WHERE tenant_id = :tenantId AND id = :entityId AND status = 'ACTIVE'
+                            """).param("tenantId", tenantId).param("entityId", entityId)
+                    .query((rs, row) -> node(mapRow(rs, "entity_code", "entity_name", "entity_name_en",
+                            "country_region", "address", "phone", "tax_number", "br_number", "invoice_title", "bank_name",
+                            "bank_code", "swift_code", "bank_address", "bank_account", "default_currency")))
+                    .stream().findFirst().orElseThrow(() -> new DomainException("RESOURCE_NOT_FOUND",
+                            "Billing entity was not found or is not active", 404, Map.of("entity_id", entityId)));
+        }
         return jdbc.sql("""
                         SELECT entity_code, entity_name, entity_name_en, country_region, address, phone,
                                tax_number, br_number, invoice_title, bank_name, bank_code, swift_code,
@@ -192,6 +220,17 @@ public class DocumentController {
             values.put(column, rs.getString(column) == null ? "" : rs.getString(column));
         }
         return values;
+    }
+
+    private UUID requireDocumentTemplateFile(UUID tenantId, UUID templateId, String expectedType) {
+        return jdbc.sql("""
+                        SELECT file_id FROM document_templates
+                        WHERE tenant_id = :tenantId AND id = :id AND template_type = :type AND status = 'ACTIVE'
+                        """).param("tenantId", tenantId).param("id", templateId).param("type", expectedType)
+                .query(UUID.class).optional()
+                .orElseThrow(() -> new DomainException("RESOURCE_NOT_FOUND",
+                        "Document template was not found or has the wrong type", 404,
+                        Map.of("template_id", templateId, "type", expectedType)));
     }
 
     private byte[] load(UUID tenantId, UUID fileId) {
@@ -260,7 +299,7 @@ public class DocumentController {
                         SELECT invoice.invoice_number, invoice.render_model_json,
                                invoice.subtotal_minor, invoice.discount_minor,
                                invoice.tax_minor, invoice.total_minor,
-                               profile.excel_template_file_id
+                               profile.excel_template_file_id, profile.document_template_id
                         FROM invoices invoice
                         LEFT JOIN invoice_profiles profile
                           ON profile.tenant_id = invoice.tenant_id AND profile.id = invoice.invoice_profile_id
@@ -268,6 +307,7 @@ public class DocumentController {
                         """).param("tenantId", tenantId).param("id", invoiceId)
                 .query((rs, row) -> new InvoiceTemplate(rs.getString("invoice_number"),
                         rs.getString("render_model_json"), rs.getObject("excel_template_file_id", UUID.class),
+                        rs.getObject("document_template_id", UUID.class),
                         rs.getLong("subtotal_minor"), rs.getLong("discount_minor"),
                         rs.getLong("tax_minor"), rs.getLong("total_minor")))
                 .optional()
@@ -321,6 +361,10 @@ public class DocumentController {
     }
 
     private record InvoiceTemplate(String invoiceNumber, String renderModelJson, UUID excelTemplateFileId,
-                                   long subtotalMinor, long discountMinor, long taxMinor, long totalMinor) {
+                                   UUID documentTemplateId, long subtotalMinor, long discountMinor,
+                                   long taxMinor, long totalMinor) {
+    }
+
+    public record ContractRenderRequest(UUID templateId, UUID billingEntityId) {
     }
 }

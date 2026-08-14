@@ -7,5 +7,8 @@
  */
 
 export type List5Params = {
+limit?: number;
+cursor?: string;
 status?: string;
+q?: string;
 };

@@ -11,6 +11,7 @@ export interface ProfileUpdateRequest {
   profile_name?: string;
   template_id?: string;
   billing_entity_id?: string;
+  excel_template_file_id?: string;
   language?: string;
   timezone?: string;
   /**

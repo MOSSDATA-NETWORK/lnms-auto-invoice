@@ -1,14 +1,14 @@
 import { queryOptions } from '@tanstack/react-query'
 import Decimal from 'decimal.js'
 import { detail as fetchInvoiceDetail } from './generated/formal-invoice-controller/formal-invoice-controller'
-import { list7 as fetchImports } from './generated/import-controller/import-controller'
+import { list8 as fetchImports } from './generated/import-controller/import-controller'
 import {
   invoices as fetchInvoices,
   preview1 as fetchPreview,
   previews as fetchPreviews,
 } from './generated/invoice-lifecycle-controller/invoice-lifecycle-controller'
 import { list3 as fetchProfiles } from './generated/invoice-profile-controller/invoice-profile-controller'
-import { list6 as fetchJobs } from './generated/job-controller/job-controller'
+import { list7 as fetchJobs } from './generated/job-controller/job-controller'
 import {
   discovered as fetchDiscoveredBills,
   list1 as fetchLibrenmsInstances,
@@ -1365,6 +1365,7 @@ export function updateInvoiceProfile(
     profile_name?: string
     billing_entity_id?: string
     template_id?: string
+    document_template_id?: string
     language?: string
     timezone?: string
     billing_day?: number
@@ -1458,27 +1459,42 @@ export interface RenderedFile {
 
 export async function uploadContractTemplate(
   contractId: string,
+  version: number,
   file: File
 ): Promise<RenderedFile> {
   const form = new FormData()
   form.append('file', file)
-  return (await api.post(`/contracts/${contractId}/template`, form))
-    .data as RenderedFile
+  return (
+    await api.post(`/contracts/${contractId}/template`, form, {
+      headers: { 'If-Match': `W/"${version}"` },
+    })
+  ).data as RenderedFile
 }
 
-export async function renderContractDocument(contractId: string) {
-  return (await api.post(`/contracts/${contractId}/render`, {}))
-    .data as RenderedFile
+export async function renderContractDocument(
+  contractId: string,
+  options?: { templateId?: string; billingEntityId?: string }
+) {
+  const body: Record<string, string> = {}
+  if (options?.templateId) body.template_id = options.templateId
+  if (options?.billingEntityId) body.billing_entity_id = options.billingEntityId
+  return (
+    await api.post(`/contracts/${contractId}/render`, body)
+  ).data as RenderedFile
 }
 
 export async function uploadProfileExcelTemplate(
   profileId: string,
+  version: number,
   file: File
 ): Promise<RenderedFile> {
   const form = new FormData()
   form.append('file', file)
-  return (await api.post(`/invoice-profiles/${profileId}/excel-template`, form))
-    .data as RenderedFile
+  return (
+    await api.post(`/invoice-profiles/${profileId}/excel-template`, form, {
+      headers: { 'If-Match': `W/"${version}"` },
+    })
+  ).data as RenderedFile
 }
 
 export async function renderInvoiceExcel(invoiceId: string) {
@@ -1496,4 +1512,54 @@ export async function downloadFile(fileId: string, filename: string) {
   anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+export type DocumentTemplate = Complete<GeneratedModel.DocumentTemplateResponse>
+
+export const documentTemplatesQuery = (type?: string) =>
+  queryOptions({
+    queryKey: ['document-templates', type],
+    queryFn: async ({ signal }) =>
+      (await api.get('/document-templates', { params: { type }, signal }))
+        .data as DocumentTemplate[],
+  })
+
+export async function uploadDocumentTemplate(
+  input: {
+    template_code: string
+    template_name: string
+    template_type: 'CONTRACT_DOCX' | 'INVOICE_XLSX'
+    description?: string
+  },
+  file: File
+) {
+  const form = new FormData()
+  form.append('template_code', input.template_code)
+  form.append('template_name', input.template_name)
+  form.append('template_type', input.template_type)
+  if (input.description) form.append('description', input.description)
+  form.append('file', file)
+  form.append('reason', '在模板中心上传模板')
+  return (
+    await api.post('/document-templates', form)
+  ).data as DocumentTemplate
+}
+
+export async function updateDocumentTemplate(
+  id: string,
+  version: number,
+  input: { template_name?: string; description?: string; status?: string },
+  file?: File
+) {
+  const form = new FormData()
+  if (input.template_name) form.append('template_name', input.template_name)
+  if (input.description) form.append('description', input.description)
+  if (input.status) form.append('status', input.status)
+  if (file) form.append('file', file)
+  form.append('reason', '在模板中心编辑模板')
+  return (
+    await api.patch(`/document-templates/${id}`, form, {
+      headers: { 'If-Match': `W/"${version}"` },
+    })
+  ).data as DocumentTemplate
 }

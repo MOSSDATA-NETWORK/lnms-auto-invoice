@@ -87,6 +87,8 @@ public class SecurityConfiguration {
                                 "/api/v1/invoice-profiles/*/excel-template",
                                 "/api/v1/librenms/instances",
                                 "/api/v1/billing-entities",
+                                "/api/v1/document-templates",
+                                "/api/v1/document-templates/**",
                                 "/api/v1/billing-entities/**",
                                 "/api/v1/pricing-rules/**",
                                 "/api/v1/pricing-rule-versions/**",

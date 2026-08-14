@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight,
@@ -13,13 +13,13 @@ import {
   Plus,
   Tags,
   Trash2,
-  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { customersQuery } from '@/api/customers'
 import { problemFrom } from '@/api/http'
 import {
   activateContract,
+  billingEntitiesQuery,
   companiesQuery,
   contractItemsQuery,
   contractsQuery,
@@ -27,16 +27,16 @@ import {
   createContractItem,
   createPricingRule,
   createPricingVersion,
+  documentTemplatesQuery,
+  downloadFile,
   pricingRuleDetailQuery,
   pricingRulesQuery,
   publishPricingVersion,
+  renderContractDocument,
   servicesQuery,
   updateContract,
   updateContractItem,
   validatePricingVersion,
-  renderContractDocument,
-  uploadContractTemplate,
-  downloadFile,
   type Contract,
   type ContractItem,
   type PricingVersion,
@@ -222,23 +222,18 @@ export function ContractsPage() {
       toast.error(problem.detail ?? problem.title ?? '更新计费项失败')
     },
   })
-  const templateInput = useRef<HTMLInputElement>(null)
-  const uploadTemplate = useMutation({
-    mutationFn: (file: File) =>
-      uploadContractTemplate(selectedContract!.id, file),
-    onSuccess: async (file) => {
-      toast.success(`合同模板已上传：${file.filename}`)
-      await queryClient.invalidateQueries({ queryKey: ['contracts'] })
-    },
-    onError: (error) => {
-      const problem = problemFrom(error)
-      toast.error(problem.detail ?? problem.title ?? '上传模板失败')
-    },
-  })
+  const [renderOpen, setRenderOpen] = useState(false)
+  const [renderTemplateId, setRenderTemplateId] = useState('')
+  const [renderEntityId, setRenderEntityId] = useState('')
   const renderContract = useMutation({
-    mutationFn: () => renderContractDocument(selectedContract!.id),
+    mutationFn: () =>
+      renderContractDocument(selectedContract!.id, {
+        templateId: renderTemplateId || undefined,
+        billingEntityId: renderEntityId || undefined,
+      }),
     onSuccess: async (file) => {
       toast.success('合同文档已生成')
+      setRenderOpen(false)
       await downloadFile(file.id, file.filename)
     },
     onError: (error) => {
@@ -476,22 +471,23 @@ export function ContractsPage() {
                 activating={activateMutation.isPending}
                 onEditContract={(contract) => setEditingContract(contract)}
                 onEditItem={(item) => setEditingItem(item)}
-                onUploadTemplate={() => templateInput.current?.click()}
-                onRenderDocument={() => renderContract.mutate()}
-                templatePending={
-                  uploadTemplate.isPending || renderContract.isPending
-                }
-              />
-              <input
-                ref={templateInput}
-                type='file'
-                accept='.docx'
-                className='hidden'
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) uploadTemplate.mutate(file)
-                  event.target.value = ''
+                onRenderDocument={() => {
+                  setRenderTemplateId('')
+                  setRenderEntityId('')
+                  setRenderOpen(true)
                 }}
+                rendering={renderContract.isPending}
+              />
+              <RenderContractDialog
+                open={renderOpen}
+                contract={selectedContract}
+                templateId={renderTemplateId}
+                entityId={renderEntityId}
+                onTemplateChange={setRenderTemplateId}
+                onEntityChange={setRenderEntityId}
+                pending={renderContract.isPending}
+                onClose={() => setRenderOpen(false)}
+                onRender={() => renderContract.mutate()}
               />
             </div>
           </TabsContent>
@@ -1381,9 +1377,8 @@ function ContractInspector({
   activating,
   onEditContract,
   onEditItem,
-  onUploadTemplate,
   onRenderDocument,
-  templatePending,
+  rendering,
 }: {
   contract?: Contract
   items: ContractItem[]
@@ -1393,9 +1388,8 @@ function ContractInspector({
   activating: boolean
   onEditContract: (contract: Contract) => void
   onEditItem: (item: ContractItem) => void
-  onUploadTemplate: () => void
   onRenderDocument: () => void
-  templatePending: boolean
+  rendering: boolean
 }) {
   if (!contract) {
     return (
@@ -1427,15 +1421,7 @@ function ContractInspector({
             </Button>
             <Button
               size='sm'
-              variant='outline'
-              disabled={templatePending}
-              onClick={onUploadTemplate}
-            >
-              <Upload /> Word 模板
-            </Button>
-            <Button
-              size='sm'
-              disabled={templatePending}
+              disabled={rendering}
               onClick={onRenderDocument}
             >
               <FileText /> 生成合同
@@ -1506,6 +1492,126 @@ function ContractInspector({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function RenderContractDialog({
+  open,
+  contract,
+  templateId,
+  entityId,
+  onTemplateChange,
+  onEntityChange,
+  pending,
+  onClose,
+  onRender,
+}: {
+  open: boolean
+  contract?: Contract
+  templateId: string
+  entityId: string
+  onTemplateChange: (id: string) => void
+  onEntityChange: (id: string) => void
+  pending: boolean
+  onClose: () => void
+  onRender: () => void
+}) {
+  const contractTemplates = useQuery(documentTemplatesQuery('CONTRACT_DOCX'))
+  const entities = useQuery(billingEntitiesQuery)
+  const companies = useQuery(companiesQuery)
+  const partyB = companies.data?.find(
+    (company) => company.id === contract?.company_id
+  )
+  const partyA = entities.data?.find((entity) => entity.id === entityId)
+  const defaultEntity = entities.data?.find(
+    (entity) => entity.status === 'ACTIVE'
+  )
+  const templates = (contractTemplates.data ?? []).filter(
+    (template) => template.status === 'ACTIVE'
+  )
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>生成合同 · {contract?.contract_no}</DialogTitle>
+          <DialogDescription>
+            甲方取自公司抬头(出账主体)，乙方取自客户公司；模板来自模板中心，字段用
+            {'{{变量名}}'} 自动替换。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-4'>
+          <div className='grid gap-3 sm:grid-cols-2'>
+            <div className='rounded-lg border bg-muted/40 p-3'>
+              <p className='text-[11px] text-muted-foreground'>甲方</p>
+              <p className='mt-1 font-medium'>
+                {partyA?.entity_name ?? defaultEntity?.entity_name ?? '未配置'}
+              </p>
+              <p className='mt-1 font-mono text-[11px] text-muted-foreground'>
+                {partyA?.entity_code ??
+                  defaultEntity?.entity_code ??
+                  '请先在公司抬头维护主体'}
+              </p>
+            </div>
+            <div className='rounded-lg border bg-muted/40 p-3'>
+              <p className='text-[11px] text-muted-foreground'>乙方</p>
+              <p className='mt-1 font-medium'>
+                {partyB?.company_name ?? '未指定'}
+              </p>
+              <p className='mt-1 font-mono text-[11px] text-muted-foreground'>
+                {partyB?.invoice_title ?? partyB?.company_code ?? ''}
+              </p>
+            </div>
+          </div>
+          <div className='space-y-2'>
+            <Label>甲方(出账主体)</Label>
+            <select
+              value={entityId || (defaultEntity?.id ?? '')}
+              onChange={(event) => onEntityChange(event.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              {!entityId && !defaultEntity && (
+                <option value=''>请先配置公司抬头</option>
+              )}
+              {(entities.data ?? [])
+                .filter((entity) => entity.status === 'ACTIVE')
+                .map((entity) => (
+                  <option key={entity.id} value={entity.id}>
+                    {entity.entity_name}({entity.entity_code})
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label>合同模板(模板中心)</Label>
+            <select
+              value={templateId}
+              onChange={(event) => onTemplateChange(event.target.value)}
+              className='h-9 w-full rounded-md border bg-background px-3 text-sm'
+            >
+              <option value=''>选择 Word 合同模板</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.template_name}({template.template_code})
+                </option>
+              ))}
+            </select>
+            {!templates.length && (
+              <p className='text-xs text-muted-foreground'>
+                模板中心暂无启用的合同模板，请先上传 Word 模板。
+              </p>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            取消
+          </Button>
+          <Button disabled={pending || !templateId} onClick={onRender}>
+            {pending ? '生成中…' : '生成合同'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

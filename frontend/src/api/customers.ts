@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import { list4 as fetchCustomers } from './generated/customer-controller/customer-controller'
+import { list5 as fetchCustomers } from './generated/customer-controller/customer-controller'
 import type {
   CustomerCreateRequest,
   CustomerResponse,

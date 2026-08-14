@@ -6,6 +6,10 @@
  * OpenAPI spec version: v1
  */
 
-export type List6Params = {
-status?: string;
-};
+export interface RenderedFile {
+  id?: string;
+  filename?: string;
+  mime_type?: string;
+  size?: number;
+  sha256?: string;
+}

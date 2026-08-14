@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ScrollText,
   Settings2,
+  Stamp,
   WalletCards,
 } from 'lucide-react'
 import type { PermissionCode, Session } from '@/api/types'
@@ -86,6 +87,12 @@ const finance: GuardedItem[] = [
     url: '/payments',
     icon: WalletCards,
     permissions: ['payment.record'],
+  },
+  {
+    title: '公司抬头',
+    url: '/letterhead',
+    icon: Stamp,
+    permissions: ['payment.record', 'system.admin'],
   },
   {
     title: '报表中心',

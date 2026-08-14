@@ -8,6 +8,6 @@
 
 export type List7Params = {
 status?: string;
-import_type?: string;
+type?: string;
 limit?: number;
 };

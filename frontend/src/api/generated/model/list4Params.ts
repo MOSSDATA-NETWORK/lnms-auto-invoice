@@ -7,8 +7,5 @@
  */
 
 export type List4Params = {
-limit?: number;
-cursor?: string;
-status?: string;
-q?: string;
+type?: string;
 };

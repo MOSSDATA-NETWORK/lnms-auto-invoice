@@ -152,6 +152,9 @@ public class InvoiceProfileController {
         if (request.templateId() != null) {
             requirePublishedTemplate(actor.tenantId(), request.templateId());
         }
+        if (request.documentTemplateId() != null) {
+            requireDocumentTemplate(actor.tenantId(), request.documentTemplateId());
+        }
         if ("ACTIVE".equals(request.status())) {
             ValidationResponse validation = validateProfile(actor.tenantId(), id);
             if (!validation.valid()) {
@@ -163,6 +166,8 @@ public class InvoiceProfileController {
         int changed = jdbc.sql("""
                         UPDATE invoice_profiles SET profile_name = COALESCE(:name, profile_name),
                             billing_entity_id = COALESCE(:billingEntityId, billing_entity_id),
+                            excel_template_file_id = COALESCE(:excelTemplateFileId, excel_template_file_id),
+                            document_template_id = COALESCE(:documentTemplateId, document_template_id),
                             template_id = COALESCE(:templateId, template_id), language = COALESCE(:language, language),
                             timezone = COALESCE(:timezone, timezone), billing_day = COALESCE(:billingDay, billing_day),
                             payment_terms_days = COALESCE(:paymentTerms, payment_terms_days),
@@ -178,6 +183,8 @@ public class InvoiceProfileController {
                 .param("name", request.profileName()).param("templateId", request.templateId())
                 .param("language", request.language()).param("timezone", request.timezone())
                 .param("billingEntityId", request.billingEntityId())
+                .param("excelTemplateFileId", request.excelTemplateFileId())
+                .param("documentTemplateId", request.documentTemplateId())
                 .param("billingDay", request.billingDay()).param("paymentTerms", request.paymentTermsDays())
                 .param("numberRule", request.invoiceNumberRule()).param("paymentAccount", nullableJson(request.paymentAccount()))
                 .param("recipients", nullableJson(request.recipients())).param("autoGenerate", request.autoGenerate())
@@ -437,6 +444,22 @@ public class InvoiceProfileController {
         }
     }
 
+    private void requireDocumentTemplate(UUID tenantId, UUID templateId) {
+        boolean exists = jdbc.sql("""
+                        SELECT EXISTS(
+                            SELECT 1 FROM document_templates
+                            WHERE tenant_id = :tenantId AND id = :id
+                              AND template_type = 'INVOICE_XLSX' AND status = 'ACTIVE'
+                        )
+                        """)
+                .param("tenantId", tenantId).param("id", templateId).query(Boolean.class).single();
+        if (!exists) {
+            throw new DomainException("TEMPLATE_VERSION_REQUIRED",
+                    "Invoice profile requires an active INVOICE_XLSX document template from the template center", 422,
+                    Map.of("document_template_id", templateId));
+        }
+    }
+
     private void requireCompany(UUID tenantId, UUID customerId, UUID companyId) {
         boolean exists = jdbc.sql("SELECT EXISTS(SELECT 1 FROM companies WHERE tenant_id = :tenantId AND id = :companyId AND customer_id = :customerId AND status = 'ACTIVE')")
                 .param("tenantId", tenantId).param("companyId", companyId).param("customerId", customerId)
@@ -473,7 +496,8 @@ public class InvoiceProfileController {
                 rs.getString("profile_name"), rs.getObject("customer_id", UUID.class),
                 rs.getObject("company_id", UUID.class), rs.getObject("template_id", UUID.class),
                 rs.getObject("approval_workflow_id", UUID.class),
-                rs.getObject("billing_entity_id", UUID.class), rs.getString("language"),
+                rs.getObject("billing_entity_id", UUID.class), rs.getObject("excel_template_file_id", UUID.class),
+                rs.getObject("document_template_id", UUID.class), rs.getString("language"),
                 rs.getString("currency_code"), rs.getString("timezone"), rs.getString("billing_cycle"),
                 rs.getObject("billing_day", Integer.class), rs.getInt("payment_terms_days"),
                 rs.getString("tax_calculation_mode"), rs.getString("invoice_number_rule"),
@@ -540,7 +564,8 @@ public class InvoiceProfileController {
             String notes, @NotBlank String reason) {
     }
 
-    public record ProfileUpdateRequest(String profileName, UUID templateId, UUID billingEntityId, String language, String timezone,
+    public record ProfileUpdateRequest(String profileName, UUID templateId, UUID billingEntityId,
+                                       UUID excelTemplateFileId, UUID documentTemplateId, String language, String timezone,
                                        @Min(1) @Max(28) Integer billingDay,
                                        @PositiveOrZero Integer paymentTermsDays, String invoiceNumberRule,
                                        JsonNode paymentAccount, JsonNode recipients, Boolean autoGenerate,
@@ -558,7 +583,8 @@ public class InvoiceProfileController {
     }
 
     public record ProfileResponse(UUID id, String profileCode, String profileName, UUID customerId,
-                                  UUID companyId, UUID templateId, UUID approvalWorkflowId, UUID billingEntityId, String language,
+                                  UUID companyId, UUID templateId, UUID approvalWorkflowId, UUID billingEntityId,
+                                  UUID excelTemplateFileId, UUID documentTemplateId, String language,
                                   String currencyCode, String timezone, String billingCycle, Integer billingDay,
                                   int paymentTermsDays, String taxCalculationMode, String invoiceNumberRule,
                                   JsonNode paymentAccount, JsonNode recipients, boolean autoGenerate,

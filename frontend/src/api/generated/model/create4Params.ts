@@ -6,6 +6,10 @@
  * OpenAPI spec version: v1
  */
 
-export type List6Params = {
-status?: string;
+export type Create4Params = {
+template_code: string;
+template_name: string;
+template_type: string;
+description?: string;
+reason?: string;
 };

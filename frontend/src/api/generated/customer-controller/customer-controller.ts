@@ -30,7 +30,7 @@ import type {
   CustomerCreateRequest,
   CustomerResponse,
   CustomerUpdateRequest,
-  List4Params
+  List5Params
 } from '../model';
 
 import { apiMutator } from '../../http';
@@ -53,8 +53,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
-export const list4 = (
-    params?: List4Params,
+export const list5 = (
+    params?: List5Params,
  signal?: AbortSignal
 ) => {
 
@@ -69,66 +69,66 @@ export const list4 = (
 
 
 
-export const getList4QueryKey = (params?: List4Params,) => {
+export const getList5QueryKey = (params?: List5Params,) => {
     return [
     `/api/v1/customers`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getList4QueryOptions = <TData = Awaited<ReturnType<typeof list4>>, TError = unknown>(params?: List4Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list4>>, TError, TData>>, }
+export const getList5QueryOptions = <TData = Awaited<ReturnType<typeof list5>>, TError = unknown>(params?: List5Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list5>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getList4QueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getList5QueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof list4>>> = ({ signal }) => list4(params, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof list5>>> = ({ signal }) => list5(params, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof list4>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof list5>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type List4QueryResult = NonNullable<Awaited<ReturnType<typeof list4>>>
-export type List4QueryError = unknown
+export type List5QueryResult = NonNullable<Awaited<ReturnType<typeof list5>>>
+export type List5QueryError = unknown
 
 
-export function useList4<TData = Awaited<ReturnType<typeof list4>>, TError = unknown>(
- params: undefined |  List4Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof list4>>, TError, TData>> & Pick<
+export function useList5<TData = Awaited<ReturnType<typeof list5>>, TError = unknown>(
+ params: undefined |  List5Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof list5>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof list4>>,
+          Awaited<ReturnType<typeof list5>>,
           TError,
-          Awaited<ReturnType<typeof list4>>
+          Awaited<ReturnType<typeof list5>>
         > , 'initialData'
       >, }
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useList4<TData = Awaited<ReturnType<typeof list4>>, TError = unknown>(
- params?: List4Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list4>>, TError, TData>> & Pick<
+export function useList5<TData = Awaited<ReturnType<typeof list5>>, TError = unknown>(
+ params?: List5Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list5>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof list4>>,
+          Awaited<ReturnType<typeof list5>>,
           TError,
-          Awaited<ReturnType<typeof list4>>
+          Awaited<ReturnType<typeof list5>>
         > , 'initialData'
       >, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useList4<TData = Awaited<ReturnType<typeof list4>>, TError = unknown>(
- params?: List4Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list4>>, TError, TData>>, }
+export function useList5<TData = Awaited<ReturnType<typeof list5>>, TError = unknown>(
+ params?: List5Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list5>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
-export function useList4<TData = Awaited<ReturnType<typeof list4>>, TError = unknown>(
- params?: List4Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list4>>, TError, TData>>, }
+export function useList5<TData = Awaited<ReturnType<typeof list5>>, TError = unknown>(
+ params?: List5Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof list5>>, TError, TData>>, }
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getList4QueryOptions(params,options)
+  const queryOptions = getList5QueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -140,7 +140,7 @@ export function useList4<TData = Awaited<ReturnType<typeof list4>>, TError = unk
 
 
 
-export const create4 = (
+export const create5 = (
     customerCreateRequest: CustomerCreateRequest,
  signal?: AbortSignal
 ) => {
@@ -157,11 +157,11 @@ export const create4 = (
 
 
 
-export const getCreate4MutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof create4>>, TError,{data: CustomerCreateRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof create4>>, TError,{data: CustomerCreateRequest}, TContext> => {
+export const getCreate5MutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof create5>>, TError,{data: CustomerCreateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof create5>>, TError,{data: CustomerCreateRequest}, TContext> => {
 
-const mutationKey = ['create4'];
+const mutationKey = ['create5'];
 const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -171,10 +171,10 @@ const {mutation: mutationOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof create4>>, {data: CustomerCreateRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof create5>>, {data: CustomerCreateRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  create4(data,)
+          return  create5(data,)
         }
 
 
@@ -184,19 +184,19 @@ const {mutation: mutationOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type Create4MutationResult = NonNullable<Awaited<ReturnType<typeof create4>>>
-    export type Create4MutationBody = CustomerCreateRequest
-    export type Create4MutationError = unknown
+    export type Create5MutationResult = NonNullable<Awaited<ReturnType<typeof create5>>>
+    export type Create5MutationBody = CustomerCreateRequest
+    export type Create5MutationError = unknown
 
-    export const useCreate4 = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof create4>>, TError,{data: CustomerCreateRequest}, TContext>, }
+    export const useCreate5 = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof create5>>, TError,{data: CustomerCreateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof create4>>,
+        Awaited<ReturnType<typeof create5>>,
         TError,
         {data: CustomerCreateRequest},
         TContext
       > => {
-      return useMutation(getCreate4MutationOptions(options), queryClient);
+      return useMutation(getCreate5MutationOptions(options), queryClient);
     }
     export const archive = (
     id: string,
@@ -343,7 +343,7 @@ export function useGet1<TData = Awaited<ReturnType<typeof get1>>, TError = unkno
 
 
 
-export const update3 = (
+export const update4 = (
     id: string,
     customerUpdateRequest: CustomerUpdateRequest,
  signal?: AbortSignal
@@ -361,11 +361,11 @@ export const update3 = (
 
 
 
-export const getUpdate3MutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update3>>, TError,{id: string;data: CustomerUpdateRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof update3>>, TError,{id: string;data: CustomerUpdateRequest}, TContext> => {
+export const getUpdate4MutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update4>>, TError,{id: string;data: CustomerUpdateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof update4>>, TError,{id: string;data: CustomerUpdateRequest}, TContext> => {
 
-const mutationKey = ['update3'];
+const mutationKey = ['update4'];
 const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -375,10 +375,10 @@ const {mutation: mutationOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof update3>>, {id: string;data: CustomerUpdateRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof update4>>, {id: string;data: CustomerUpdateRequest}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  update3(id,data,)
+          return  update4(id,data,)
         }
 
 
@@ -388,17 +388,17 @@ const {mutation: mutationOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type Update3MutationResult = NonNullable<Awaited<ReturnType<typeof update3>>>
-    export type Update3MutationBody = CustomerUpdateRequest
-    export type Update3MutationError = unknown
+    export type Update4MutationResult = NonNullable<Awaited<ReturnType<typeof update4>>>
+    export type Update4MutationBody = CustomerUpdateRequest
+    export type Update4MutationError = unknown
 
-    export const useUpdate3 = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update3>>, TError,{id: string;data: CustomerUpdateRequest}, TContext>, }
+    export const useUpdate4 = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof update4>>, TError,{id: string;data: CustomerUpdateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof update3>>,
+        Awaited<ReturnType<typeof update4>>,
         TError,
         {id: string;data: CustomerUpdateRequest},
         TContext
       > => {
-      return useMutation(getUpdate3MutationOptions(options), queryClient);
+      return useMutation(getUpdate4MutationOptions(options), queryClient);
     }
