@@ -1563,3 +1563,10 @@ export async function updateDocumentTemplate(
     })
   ).data as DocumentTemplate
 }
+
+export async function deleteDocumentTemplate(id: string, version: number) {
+  return await api.delete(`/document-templates/${id}`, {
+    headers: { 'If-Match': `W/"${version}"` },
+    params: { reason: '在模板中心删除模板' },
+  })
+}

@@ -7,6 +7,7 @@ import {
   LockKeyhole,
   Plus,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { problemFrom } from '@/api/http'
@@ -14,6 +15,7 @@ import {
   copyInvoiceTemplate,
   createInvoiceTemplate,
   createTemplateVersion,
+  deleteDocumentTemplate,
   documentTemplatesQuery,
   publishTemplateVersion,
   templateDetailQuery,
@@ -512,6 +514,22 @@ function DocTemplatesTab({
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File>()
   const [toggling, setToggling] = useState<string>()
+  const [deleting, setDeleting] = useState<DocumentTemplate>()
+  const remove = useMutation({
+    mutationFn: (template: DocumentTemplate) =>
+      deleteDocumentTemplate(template.id!, template.version ?? 0),
+    onSuccess: async () => {
+      toast.success('模板已删除')
+      setDeleting(undefined)
+      await queryClient.invalidateQueries({
+        queryKey: ['document-templates', type],
+      })
+    },
+    onError: (error) => {
+      const problem = problemFrom(error)
+      toast.error(problem.detail ?? problem.title ?? '删除失败')
+    },
+  })
 
   const submit = async () => {
     if (!file) return
@@ -630,14 +648,26 @@ function DocTemplatesTab({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size='sm'
-                      variant='ghost'
-                      disabled={toggling === template.id}
-                      onClick={() => toggle(template)}
-                    >
-                      {template.status === 'ACTIVE' ? '停用' : '启用'}
-                    </Button>
+                    <div className='flex justify-end gap-1'>
+                      <Button
+                        size='sm'
+                        variant='ghost'
+                        disabled={toggling === template.id}
+                        onClick={() => toggle(template)}
+                      >
+                        {template.status === 'ACTIVE' ? '停用' : '启用'}
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='ghost'
+                        className='text-destructive hover:text-destructive'
+                        disabled={remove.isPending}
+                        onClick={() => setDeleting(template)}
+                      >
+                        <Trash2 className='size-4' />
+                        删除
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -717,6 +747,31 @@ function DocTemplatesTab({
               onClick={submit}
             >
               {uploading ? '上传中…' : '上传'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(deleting)}
+        onOpenChange={(next) => !next && setDeleting(undefined)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除模板 · {deleting?.template_name}</DialogTitle>
+            <DialogDescription>
+              删除后不可恢复。已引用该模板的账单配置会自动改为「未选择」，正式账单将回退到该配置的上传模板（若存在），否则无法再导出 Excel。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setDeleting(undefined)}>
+              取消
+            </Button>
+            <Button
+              variant='destructive'
+              disabled={remove.isPending}
+              onClick={() => deleting && remove.mutate(deleting)}
+            >
+              {remove.isPending ? '删除中…' : '确认删除'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -82,6 +82,39 @@ const serviceTypes = [
   'CUSTOM',
 ]
 
+const serviceTypeLabels: Record<string, string> = {
+  BANDWIDTH_95: '95计费带宽',
+  FIXED_BANDWIDTH: '固定带宽',
+  TOTAL_TRAFFIC: '总流量',
+  COLOCATION: '主机托管',
+  SERVER: '服务器',
+  RACK: '机柜',
+  POWER: '电力',
+  IP: 'IP地址',
+  BGP: 'BGP互联',
+  DEDICATED_LINE: '专线',
+  CROSS_CONNECT: '交叉连接',
+  INSTALLATION: '安装实施',
+  MANAGED_SERVICE: '运维托管',
+  CUSTOM: '自定义',
+}
+
+const serviceStatusLabels: Record<string, string> = {
+  PENDING: '待开通',
+  ACTIVE: '运行中',
+  SUSPENDED: '暂停',
+  ENDED: '已结束',
+  CANCELLED: '已取消',
+}
+
+function serviceTypeLabel(type: string) {
+  return serviceTypeLabels[type] ?? type
+}
+
+function statusLabel(value: string) {
+  return serviceStatusLabels[value] ?? value
+}
+
 const emptyService = {
   service_no: '',
   company_id: '',
@@ -294,7 +327,8 @@ export function ServicesPage() {
                         <TableCell>
                           <p className='font-medium'>{service.service_name}</p>
                           <p className='mt-1 font-mono text-[11px] text-muted-foreground'>
-                            {service.service_no} · {service.service_type} · v
+                            {service.service_no} ·{' '}
+                            {serviceTypeLabel(service.service_type)} · v
                             {service.version}
                           </p>
                         </TableCell>
@@ -536,9 +570,9 @@ export function ServicesPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='PENDING'>PENDING</SelectItem>
-                  <SelectItem value='ACTIVE'>ACTIVE</SelectItem>
-                  <SelectItem value='SUSPENDED'>SUSPENDED</SelectItem>
+                  <SelectItem value='PENDING'>待开通 (PENDING)</SelectItem>
+                  <SelectItem value='ACTIVE'>运行中 (ACTIVE)</SelectItem>
+                  <SelectItem value='SUSPENDED'>暂停 (SUSPENDED)</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -741,7 +775,7 @@ function ResourceInspector({
             </CardTitle>
             <CardDescription className='mt-1 font-mono'>
               {service
-                ? `${service.service_no} · ${service.service_type}`
+                ? `${service.service_no} · ${serviceTypeLabel(service.service_type)}`
                 : '选择业务查看证据对象'}
             </CardDescription>
           </div>
@@ -862,7 +896,7 @@ function ServiceTypeSelect({
       <SelectContent>
         {serviceTypes.map((type) => (
           <SelectItem key={type} value={type}>
-            {type}
+            {serviceTypeLabel(type)} ({type})
           </SelectItem>
         ))}
       </SelectContent>
@@ -907,7 +941,7 @@ function State({ value }: { value: string }) {
             : 'secondary'
       }
     >
-      {value}
+      {statusLabel(value)}
     </Badge>
   )
 }
@@ -1054,10 +1088,10 @@ function ServiceEditDialog({
               onChange={(e) => setStatus(e.target.value)}
               className='h-9 w-full rounded-md border bg-background px-3 text-sm'
             >
-              <option value='PENDING'>PENDING</option>
-              <option value='ACTIVE'>ACTIVE</option>
-              <option value='SUSPENDED'>SUSPENDED</option>
-              <option value='ENDED'>ENDED</option>
+              <option value='PENDING'>待开通 (PENDING)</option>
+              <option value='ACTIVE'>运行中 (ACTIVE)</option>
+              <option value='SUSPENDED'>暂停 (SUSPENDED)</option>
+              <option value='ENDED'>已结束 (ENDED)</option>
             </select>
           </div>
           <div className='space-y-2'>

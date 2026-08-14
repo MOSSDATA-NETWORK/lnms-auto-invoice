@@ -101,6 +101,8 @@ public class SecurityConfiguration {
                                 "/api/v1/librenms/instances/**",
                                 "/api/v1/billing-entities/**")
                         .access(mfaAuthorizationManager)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/document-templates/**")
+                        .access(mfaAuthorizationManager)
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new HttpStatusEntryPoint(UNAUTHORIZED))

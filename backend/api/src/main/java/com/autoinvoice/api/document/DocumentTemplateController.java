@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -157,6 +158,29 @@ public class DocumentTemplateController {
         DocumentTemplateResponse after = find(actor.tenantId(), id);
         recordAudit(actor, "document_template.updated", id, reason, servletRequest);
         return ResponseEntity.ok().eTag(VersionEtag.format(after.version())).body(after);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('template.publish','system.admin')")
+    @Transactional
+    public ResponseEntity<Void> delete(Authentication authentication, @PathVariable UUID id,
+                                       @RequestHeader(org.springframework.http.HttpHeaders.IF_MATCH) String ifMatch,
+                                       @RequestParam(value = "reason", required = false) String reason,
+                                       HttpServletRequest servletRequest) {
+        AuthenticatedUser actor = principal(authentication);
+        DocumentTemplateResponse before = find(actor.tenantId(), id);
+        long version = VersionEtag.parse(ifMatch);
+        int changed = jdbc.sql("""
+                        DELETE FROM document_templates
+                        WHERE tenant_id = :tenantId AND id = :id AND version = :version
+                        """)
+                .param("tenantId", actor.tenantId()).param("id", id).param("version", version).update();
+        if (changed != 1) {
+            throw new DomainException("VERSION_CONFLICT", "Document template was modified by another request", 409,
+                    Map.of("expected_version", version));
+        }
+        recordAudit(actor, "document_template.deleted", id, reason, servletRequest);
+        return ResponseEntity.noContent().build();
     }
 
     private DocumentTemplateResponse find(UUID tenantId, UUID id) {
